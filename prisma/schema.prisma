@@ -1,0 +1,135 @@
+// Rahoot data model
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum HomeworkMode {
+  LIVE // Kahoot-style: admin hosts a session, everyone answers together in real time
+  ASYNC // Homework-style: each student works through it on their own schedule
+}
+
+enum HomeworkStatus {
+  DRAFT // Being built by the admin, QR code not active yet
+  OPEN // QR code active - students may join (and for ASYNC, play immediately)
+  CLOSED // No longer joinable, kept for the leaderboard/history
+}
+
+// Only meaningful while mode = LIVE
+enum LivePhase {
+  LOBBY // Waiting for the host to start; students are in the waiting room
+  QUESTION // Current question is live, clock is running
+  REVEAL // Correct answer + per-question results being shown
+  FINISHED // All questions done, final leaderboard shown
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  PARAGRAPH
+}
+
+model Homework {
+  id          String         @id @default(cuid())
+  title       String
+  description String?
+  mode        HomeworkMode
+  status      HomeworkStatus @default(DRAFT)
+
+  // Short, human-typeable code (also encoded in the QR link) students use to join
+  joinCode String @unique
+
+  // Live-session state (ignored for ASYNC homework)
+  livePhase           LivePhase? @default(LOBBY)
+  currentQuestionIndex Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  questions Question[]
+  students  Student[]
+
+  @@map("homeworks")
+}
+
+model Question {
+  id         String       @id @default(cuid())
+  homeworkId String
+  homework   Homework     @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+
+  order        Int
+  type         QuestionType
+  text         String
+  points       Int          @default(1000)
+  timeLimitSec Int          @default(20)
+
+  options Option[]
+  answers Answer[]
+
+  @@index([homeworkId])
+  @@map("questions")
+}
+
+model Option {
+  id         String   @id @default(cuid())
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  text      String
+  isCorrect Boolean @default(false)
+  order     Int
+
+  answers Answer[]
+
+  @@index([questionId])
+  @@map("options")
+}
+
+model Student {
+  id         String   @id @default(cuid())
+  homeworkId String
+  homework   Homework @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+
+  firstName String
+  lastName  String
+
+  // Random token handed back to the browser on join (localStorage) so a student
+  // re-opening the link resumes their own progress - not a real auth credential.
+  clientToken String @unique
+
+  joinedAt   DateTime  @default(now())
+  finishedAt DateTime?
+
+  answers Answer[]
+
+  @@index([homeworkId])
+  @@map("students")
+}
+
+model Answer {
+  id         String   @id @default(cuid())
+  studentId  String
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  selectedOptionId String?
+  selectedOption   Option? @relation(fields: [selectedOptionId], references: [id])
+  textAnswer       String?
+
+  // null = not graded yet (paragraph answers start out this way)
+  isCorrect     Boolean?
+  pointsAwarded Int      @default(0)
+
+  answeredAt DateTime  @default(now())
+  gradedAt   DateTime?
+
+  @@unique([studentId, questionId])
+  @@index([questionId])
+  @@map("answers")
+}

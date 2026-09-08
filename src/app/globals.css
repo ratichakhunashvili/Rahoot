@@ -2,25 +2,107 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #1a1a1a;
+
+  /* Rahoot brand palette: red & white, high contrast */
+  --rahoot-red: #dc2626;
+  --rahoot-red-dark: #991b1b;
+  --rahoot-red-light: #fee2e2;
+  --rahoot-white: #ffffff;
+  --rahoot-ink: #1a1a1a;
+  --rahoot-muted: #6b7280;
+  --rahoot-border: #f1d1d1;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-rahoot-red: var(--rahoot-red);
+  --color-rahoot-red-dark: var(--rahoot-red-dark);
+  --color-rahoot-red-light: var(--rahoot-red-light);
+  --color-rahoot-white: var(--rahoot-white);
+  --color-rahoot-ink: var(--rahoot-ink);
+  --color-rahoot-muted: var(--rahoot-muted);
+  --color-rahoot-border: var(--rahoot-border);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Reusable building blocks so pages don't repeat the same long class strings */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  font-weight: 700;
+  padding: 0.75rem 1.5rem;
+  transition: transform 0.1s ease, background-color 0.15s ease;
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+.btn:active {
+  transform: scale(0.97);
+}
+.btn-primary {
+  background: var(--rahoot-red);
+  color: white;
+}
+.btn-primary:hover {
+  background: var(--rahoot-red-dark);
+}
+.btn-outline {
+  background: white;
+  color: var(--rahoot-red);
+  border-color: var(--rahoot-red);
+}
+.btn-outline:hover {
+  background: var(--rahoot-red-light);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.card {
+  background: white;
+  border: 1px solid var(--rahoot-border);
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(220, 38, 38, 0.08);
+}
+
+.input {
+  width: 100%;
+  border: 2px solid var(--rahoot-border);
+  border-radius: 0.75rem;
+  padding: 0.65rem 1rem;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.input:focus {
+  border-color: var(--rahoot-red);
+}
+
+/* Question form: hide the multiple-choice options block when "Paragraph" is selected - no JS needed */
+.question-form:has(input[name="type"][value="PARAGRAPH"]:checked) [data-mc-only] {
+  display: none;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.15rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }

@@ -16,8 +16,8 @@ export default async function AdminDashboardLayout({
   }
 
   return (
-    <div className="flex min-h-full flex-1 flex-col bg-zinc-50">
-      <header className="border-b-4 border-rahoot-red bg-white">
+    <div className="flex min-h-full flex-1 flex-col">
+      <header className="border-b-4 border-rahoot-red bg-rahoot-surface">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <Link href="/admin" className="flex items-center gap-2 text-2xl font-black text-rahoot-red">
             <LogoMark size={26} />

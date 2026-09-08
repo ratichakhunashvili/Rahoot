@@ -1,17 +1,21 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #1a1a1a;
+  --background: #0b0b0d;
+  --foreground: #fdf6ec;
 
-  /* Rahoot brand palette: red & white, high contrast */
-  --rahoot-red: #dc2626;
-  --rahoot-red-dark: #991b1b;
-  --rahoot-red-light: #fee2e2;
-  --rahoot-white: #ffffff;
-  --rahoot-ink: #1a1a1a;
-  --rahoot-muted: #6b7280;
-  --rahoot-border: #f1d1d1;
+  /* Rahoot brand palette: matches the owl logo - black, warm orange, cream.
+     Token names kept as "rahoot-red" etc. since they're used as utility
+     classes everywhere (bg-rahoot-red, text-rahoot-red...) - only the
+     values changed, from the old red/white scheme to this one. */
+  --rahoot-red: #f97316;
+  --rahoot-red-dark: #ea580c;
+  --rahoot-red-light: rgba(249, 115, 22, 0.16);
+  --rahoot-white: #fdf6ec;
+  --rahoot-ink: #fdf6ec;
+  --rahoot-muted: #a1a1aa;
+  --rahoot-border: #2a2a2e;
+  --rahoot-surface: #18181b;
 }
 
 @theme inline {
@@ -24,6 +28,7 @@
   --color-rahoot-ink: var(--rahoot-ink);
   --color-rahoot-muted: var(--rahoot-muted);
   --color-rahoot-border: var(--rahoot-border);
+  --color-rahoot-surface: var(--rahoot-surface);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -32,6 +37,7 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
+  color-scheme: dark;
 }
 
 /* Reusable building blocks so pages don't repeat the same long class strings */
@@ -52,13 +58,13 @@ body {
 }
 .btn-primary {
   background: var(--rahoot-red);
-  color: white;
+  color: #1a1005;
 }
 .btn-primary:hover {
   background: var(--rahoot-red-dark);
 }
 .btn-outline {
-  background: white;
+  background: var(--rahoot-surface);
   color: var(--rahoot-red);
   border-color: var(--rahoot-red);
 }
@@ -72,14 +78,16 @@ body {
 }
 
 .card {
-  background: white;
+  background: var(--rahoot-surface);
   border: 1px solid var(--rahoot-border);
   border-radius: 1rem;
-  box-shadow: 0 1px 3px rgba(220, 38, 38, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 .input {
   width: 100%;
+  background: var(--rahoot-surface);
+  color: var(--foreground);
   border: 2px solid var(--rahoot-border);
   border-radius: 0.75rem;
   padding: 0.65rem 1rem;

@@ -1,13 +1,13 @@
 import "server-only";
-import { cookies } from "next/headers";
 import {
   adminSessionCookieName,
-  adminSessionMaxAgeSeconds,
-  signAdminToken,
   verifyAdminToken,
   verifyAdminCredentials,
+  adminFromEnvelope,
+  newAdminEntry,
   type AdminSessionPayload,
 } from "@/lib/session-core";
+import { readSessionEnvelope, writeSessionEnvelope } from "@/lib/session-envelope";
 
 export {
   adminSessionCookieName,
@@ -17,26 +17,18 @@ export {
 };
 
 export async function createAdminSession(email: string) {
-  const token = await signAdminToken(email);
-  const cookieStore = await cookies();
-  cookieStore.set(adminSessionCookieName(), token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: adminSessionMaxAgeSeconds(),
-  });
+  const envelope = await readSessionEnvelope();
+  envelope.admin = newAdminEntry(email);
+  await writeSessionEnvelope(envelope);
 }
 
 export async function destroyAdminSession() {
-  const cookieStore = await cookies();
-  cookieStore.delete(adminSessionCookieName());
+  const envelope = await readSessionEnvelope();
+  delete envelope.admin;
+  await writeSessionEnvelope(envelope);
 }
 
-/** Verifies the admin session cookie for the *current request*. Returns null if missing/invalid. */
+/** Verifies the admin sub-session for the *current request*. Returns null if missing/expired. */
 export async function getAdminSession(): Promise<AdminSessionPayload | null> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(adminSessionCookieName())?.value;
-  if (!token) return null;
-  return verifyAdminToken(token);
+  return adminFromEnvelope(await readSessionEnvelope());
 }

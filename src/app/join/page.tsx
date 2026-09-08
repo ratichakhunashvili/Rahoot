@@ -9,7 +9,7 @@ export default async function JoinPage({
   const hasError = params?.error === "empty";
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center bg-white px-6 py-16">
+    <div className="flex flex-1 flex-col items-center justify-center px-6 py-16">
       <div className="w-full max-w-sm text-center">
         <Link href="/" className="inline-block">
           <Logo size="md" className="justify-center" />

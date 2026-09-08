@@ -46,7 +46,7 @@ export default async function GradeHomeworkPage({
                     {a.student.firstName} {a.student.lastName}
                   </p>
                   <p className="mt-1 font-medium">{a.question.text}</p>
-                  <p className="mt-2 rounded-lg bg-zinc-50 p-3 text-sm whitespace-pre-wrap">
+                  <p className="mt-2 rounded-lg bg-zinc-900 p-3 text-sm whitespace-pre-wrap">
                     {a.textAnswer || <em className="text-rahoot-muted">No answer submitted</em>}
                   </p>
                   <form action={action} className="mt-3 flex flex-wrap items-center gap-3">

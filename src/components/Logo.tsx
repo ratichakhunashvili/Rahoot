@@ -57,7 +57,7 @@ export function LogoMark({
       aria-hidden="true"
       className="shrink-0"
     >
-      {variant === "badge" && <rect width="32" height="32" rx="8" fill="#DC2626" />}
+      {variant === "badge" && <rect width="32" height="32" rx="8" fill="#F97316" />}
       <path d={BOLT_PATH} fill="white" />
     </svg>
   );

@@ -2,9 +2,9 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 
 const STATUS_STYLES: Record<string, string> = {
-  DRAFT: "bg-zinc-200 text-zinc-700",
-  OPEN: "bg-green-100 text-green-800",
-  CLOSED: "bg-zinc-200 text-zinc-500",
+  DRAFT: "bg-zinc-800 text-zinc-300",
+  OPEN: "bg-green-900 text-green-300",
+  CLOSED: "bg-zinc-800 text-zinc-500",
 };
 
 export default async function AdminHomePage() {

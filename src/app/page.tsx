@@ -3,11 +3,11 @@ import { Logo } from "@/components/Logo";
 
 export default function Home() {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center bg-rahoot-red px-6 py-16 text-[#1a1005]">
+    <div className="flex flex-1 flex-col items-center justify-center border-t-4 border-rahoot-red bg-background px-6 py-16 text-rahoot-ink">
       <div className="w-full max-w-md text-center">
         <h1 className="sr-only">Rahoot</h1>
         <Logo size={220} priority className="shadow-lg" />
-        <p className="mt-5 text-lg text-[#1a1005]/70">
+        <p className="mt-5 text-lg text-rahoot-muted">
           Scan the QR code your teacher shows you to jump straight in.
         </p>
 
@@ -24,7 +24,7 @@ export default function Home() {
 
       <Link
         href="/admin/login"
-        className="mt-16 text-sm text-[#1a1005]/70 underline-offset-4 hover:underline"
+        className="mt-16 text-sm text-rahoot-muted underline-offset-4 hover:text-rahoot-ink hover:underline"
       >
         Admin login
       </Link>

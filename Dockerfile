@@ -13,6 +13,11 @@
 FROM node:22-slim AS base
 WORKDIR /app
 
+# Prisma's query engine needs OpenSSL on the base image, or it falls back to
+# guessing a version and can misbehave at runtime - node:22-slim doesn't
+# include it out of the box.
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
 # Install dependencies first (better layer caching). package-lock.json's
 # postinstall (`prisma generate`) needs the schema present, and prisma.config.ts
 # needs *a* DATABASE_URL to resolve even though generate doesn't connect to it -

@@ -1,12 +1,20 @@
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
 
+// This page has no per-request data, so Next would otherwise mark it fully
+// static and send a year-long s-maxage - which Firebase Hosting's CDN then
+// caches at the edge with no way to bust it on a redeploy short of a
+// version change (see the Cloud Run + Firebase Hosting caching gotcha this
+// fixes: a stale homepage kept being served after multiple deploys because
+// of exactly this). Forcing it dynamic keeps every deploy visible immediately.
+export const dynamic = "force-dynamic";
+
 export default function Home() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center border-t-4 border-rahoot-red bg-background px-6 py-16 text-rahoot-ink">
       <div className="w-full max-w-md text-center">
         <h1 className="sr-only">Rahoot</h1>
-        <Logo size={220} priority className="shadow-lg" />
+        <Logo size={280} priority />
         <p className="mt-5 text-lg text-rahoot-muted">
           Scan the QR code your teacher shows you to jump straight in.
         </p>

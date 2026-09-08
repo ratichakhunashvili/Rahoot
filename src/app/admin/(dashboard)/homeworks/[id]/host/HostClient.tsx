@@ -59,11 +59,19 @@ export function HostClient({
     };
     const onCount = ({ answered }: { answered: number; total: number }) =>
       setAnsweredCount(answered);
+    const onLobbyPhase = () => {
+      setQuestion(null);
+      setReveal(null);
+      setFinished(null);
+      setAnsweredCount(0);
+      setPhase("lobby");
+    };
 
     socket.on("lobby:update", onLobby);
     socket.on("phase:question", onQuestion);
     socket.on("phase:reveal", onReveal);
     socket.on("phase:finished", onFinished);
+    socket.on("phase:lobby", onLobbyPhase);
     socket.on("answer:count", onCount);
 
     return () => {
@@ -71,6 +79,7 @@ export function HostClient({
       socket.off("phase:question", onQuestion);
       socket.off("phase:reveal", onReveal);
       socket.off("phase:finished", onFinished);
+      socket.off("phase:lobby", onLobbyPhase);
       socket.off("answer:count", onCount);
     };
   }, [homeworkId]);
@@ -89,6 +98,15 @@ export function HostClient({
   const start = () => getSocket().emit("host:start", { homeworkId });
   const next = () => getSocket().emit("host:next", { homeworkId });
   const end = () => getSocket().emit("host:end", { homeworkId });
+  const restart = () => {
+    if (
+      window.confirm(
+        "Restart the game? This deletes every answer already submitted for this homework and sends everyone back to the lobby."
+      )
+    ) {
+      getSocket().emit("host:restart", { homeworkId });
+    }
+  };
 
   if (error) {
     return (
@@ -213,14 +231,22 @@ export function HostClient({
           <div className="mt-6 w-full max-w-sm">
             <Leaderboard entries={finished.leaderboard} />
           </div>
-          <Link href={`/admin/homeworks/${homeworkId}`} className="btn btn-outline mt-8">
-            Back to homework
-          </Link>
+          <div className="mt-8 flex gap-3">
+            <Link href={`/admin/homeworks/${homeworkId}`} className="btn btn-outline">
+              Back to homework
+            </Link>
+            <button onClick={restart} className="btn btn-primary">
+              Restart game
+            </button>
+          </div>
         </Centered>
       )}
 
       {(phase === "lobby" || phase === "question" || phase === "reveal") && (
-        <div className="mt-auto flex justify-center pt-6">
+        <div className="mt-auto flex justify-center gap-4 pt-6">
+          <button onClick={restart} className="text-sm text-rahoot-muted hover:text-rahoot-red">
+            Restart game
+          </button>
           <button onClick={end} className="text-sm text-rahoot-muted hover:text-rahoot-red">
             End session early
           </button>

@@ -14,7 +14,7 @@ export default async function AdminLoginPage({
       <div className="w-full max-w-sm">
         <div className="text-center">
           <Link href="/" className="inline-block">
-            <Logo size={110} className="mx-auto" />
+            <Logo size={150} priority className="mx-auto" />
           </Link>
           <h1 className="mt-4 text-xl font-bold">Admin login</h1>
         </div>

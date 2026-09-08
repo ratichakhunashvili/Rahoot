@@ -256,6 +256,31 @@ app.prepare().then(() => {
     io.to(`hw:${homeworkId}`).emit("phase:finished", payload);
   }
 
+  /** A true do-over: wipes every submitted answer for this homework and resets the live session back to the lobby. */
+  async function restartGame(homeworkId: string) {
+    const state = getOrCreateState(homeworkId);
+    if (state.timer) clearTimeout(state.timer);
+
+    await prisma.answer.deleteMany({ where: { question: { homeworkId } } });
+
+    state.phase = "LOBBY";
+    state.questionIndex = -1;
+    state.startedAt = null;
+    state.answeredStudentIds = new Set();
+    state.timer = null;
+    state.currentQuestionPayload = null;
+    state.lastRevealPayload = null;
+    state.lastFinishedPayload = null;
+
+    await prisma.homework.update({
+      where: { id: homeworkId },
+      data: { livePhase: "LOBBY", currentQuestionIndex: null },
+    });
+
+    io.to(`hw:${homeworkId}`).emit("phase:lobby");
+    await broadcastLobby(homeworkId);
+  }
+
   function sendCurrentPhaseTo(socket: Socket, homeworkId: string) {
     const state = liveStates.get(homeworkId);
     if (!state) return;
@@ -340,6 +365,11 @@ app.prepare().then(() => {
     socket.on("host:end", ({ homeworkId }) => {
       if (!socket.data.isHost) return;
       finishGame(homeworkId).catch((err) => console.error("host:end failed", err));
+    });
+
+    socket.on("host:restart", ({ homeworkId }) => {
+      if (!socket.data.isHost) return;
+      restartGame(homeworkId).catch((err) => console.error("host:restart failed", err));
     });
 
     socket.on("student:answer", async ({ homeworkId, questionId, selectedOptionId, textAnswer }) => {

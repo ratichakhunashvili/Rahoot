@@ -2,8 +2,9 @@ import Image from "next/image";
 
 /**
  * The Rahoot mark: the owl-with-tablet artwork with "Rahoot" baked into the
- * image (public/brand/onsite-logo.jpeg, 1:1). One image, used everywhere -
- * sized per context via `size`.
+ * image (public/brand/onsite-logo.png, 1:1, background removed so it sits
+ * directly on the page). One image, used everywhere - sized per context
+ * via `size`.
  */
 export function Logo({
   size = 96,
@@ -16,12 +17,12 @@ export function Logo({
 }) {
   return (
     <Image
-      src="/brand/onsite-logo.jpeg"
+      src="/brand/onsite-logo.png"
       alt="Rahoot"
       width={size}
       height={size}
       priority={priority}
-      className={`inline-block rounded-xl ${className}`}
+      className={`inline-block ${className}`}
     />
   );
 }

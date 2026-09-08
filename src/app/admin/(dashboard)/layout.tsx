@@ -20,7 +20,7 @@ export default async function AdminDashboardLayout({
       <header className="border-b-4 border-rahoot-red bg-rahoot-surface">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <Link href="/admin" className="flex items-center gap-2">
-            <Logo size={44} priority />
+            <Logo size={56} priority />
             <span className="text-xl font-black text-rahoot-ink">admin</span>
           </Link>
           <form action={logout}>

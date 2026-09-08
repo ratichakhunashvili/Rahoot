@@ -9,6 +9,7 @@ import {
   deleteHomework,
   deleteQuestion,
 } from "./actions";
+import { DeleteHomeworkButton } from "./DeleteHomeworkButton";
 
 const STATUS_FLOW: Array<{ value: "DRAFT" | "OPEN" | "CLOSED"; label: string; hint: string }> = [
   { value: "DRAFT", label: "Draft", hint: "Hidden - QR code doesn't work yet" },
@@ -74,15 +75,24 @@ export default async function ManageHomeworkPage({
       <section className="card p-6">
         <h2 className="font-bold">Join code &amp; QR</h2>
         <div className="mt-4 flex flex-wrap items-center gap-6">
-          <div className="inline-block rounded-2xl border-4 border-rahoot-red bg-white p-3">
-            <Image
-              src={qrDataUrl}
-              alt={`QR code to join ${homework.title}`}
-              width={200}
-              height={200}
-              unoptimized
-              className="rounded-md"
-            />
+          <div>
+            <div className="inline-block rounded-2xl border-4 border-rahoot-red bg-white p-3">
+              <Image
+                src={qrDataUrl}
+                alt={`QR code to join ${homework.title}`}
+                width={200}
+                height={200}
+                unoptimized
+                className="rounded-md"
+              />
+            </div>
+            <a
+              href={qrDataUrl}
+              download={`rahoot-${homework.joinCode}-qr.png`}
+              className="mt-2 block text-center text-sm text-rahoot-red hover:underline"
+            >
+              Download QR
+            </a>
           </div>
           <div>
             <p className="text-sm text-rahoot-muted">Join code</p>
@@ -186,9 +196,7 @@ export default async function ManageHomeworkPage({
       </section>
 
       <form action={removeHomework} className="self-start">
-        <button type="submit" className="text-sm text-rahoot-muted hover:text-rahoot-red">
-          Delete this homework permanently
-        </button>
+        <DeleteHomeworkButton title={homework.title} />
       </form>
     </div>
   );

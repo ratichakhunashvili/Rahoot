@@ -69,11 +69,22 @@ export function LiveGame({
       setPhase("finished");
     };
     const onYourResult = (r: YourResultPayload) => setYourResult(r);
+    const onLobbyPhase = () => {
+      setQuestion(null);
+      setReveal(null);
+      setFinished(null);
+      setYourResult(null);
+      setHasAnswered(false);
+      setSelectedOptionId(null);
+      setTextAnswer("");
+      setPhase("lobby");
+    };
 
     socket.on("lobby:update", onLobby);
     socket.on("phase:question", onQuestion);
     socket.on("phase:reveal", onReveal);
     socket.on("phase:finished", onFinished);
+    socket.on("phase:lobby", onLobbyPhase);
     socket.on("answer:you", onYourResult);
 
     return () => {
@@ -81,6 +92,7 @@ export function LiveGame({
       socket.off("phase:question", onQuestion);
       socket.off("phase:reveal", onReveal);
       socket.off("phase:finished", onFinished);
+      socket.off("phase:lobby", onLobbyPhase);
       socket.off("answer:you", onYourResult);
     };
   }, [homeworkId, studentId, clientToken]);
@@ -173,10 +185,9 @@ export function LiveGame({
           <>
             <div className="mt-8">
               <OptionGrid>
-                {question.options.map((opt, i) => (
+                {question.options.map((opt) => (
                   <OptionTile
                     key={opt.id}
-                    index={i}
                     onClick={() => selectMultipleChoice(opt.id)}
                     state={!hasAnswered ? "idle" : opt.id === selectedOptionId ? "selected" : "dimmed"}
                   >

@@ -51,6 +51,7 @@ export interface ServerToClientEvents {
   "phase:question": (payload: ClientQuestion) => void;
   "phase:reveal": (payload: RevealPayload) => void;
   "phase:finished": (payload: FinishedPayload) => void;
+  "phase:lobby": () => void; // host restarted the game - everyone resets back to the lobby
   "answer:you": (payload: YourResultPayload) => void; // targeted at one student's socket
   "answer:count": (payload: { answered: number; total: number }) => void;
   "error": (payload: { message: string }) => void;
@@ -69,6 +70,9 @@ export interface ClientToServerEvents {
   "host:start": (payload: { homeworkId: string }) => void;
   "host:next": (payload: { homeworkId: string }) => void;
   "host:end": (payload: { homeworkId: string }) => void;
+  // Wipes every submitted answer for this homework and resets the live
+  // session back to the lobby - a true do-over, not just "go back a phase".
+  "host:restart": (payload: { homeworkId: string }) => void;
   "student:answer": (payload: {
     homeworkId: string;
     questionId: string;

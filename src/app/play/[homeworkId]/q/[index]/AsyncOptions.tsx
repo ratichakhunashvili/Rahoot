@@ -36,7 +36,7 @@ export function AsyncOptions({
   return (
     <div ref={containerRef}>
       <OptionGrid>
-        {options.map((opt, i) => (
+        {options.map((opt) => (
           <div key={opt.id}>
             <input
               type="radio"
@@ -47,7 +47,6 @@ export function AsyncOptions({
               className="hidden"
             />
             <OptionTile
-              index={i}
               onClick={() => pick(opt.id)}
               state={submitting ? (selected === opt.id ? "selected" : "dimmed") : "idle"}
             >

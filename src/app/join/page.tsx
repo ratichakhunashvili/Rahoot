@@ -12,7 +12,7 @@ export default async function JoinPage({
     <div className="flex flex-1 flex-col items-center justify-center px-6 py-16">
       <div className="w-full max-w-sm text-center">
         <Link href="/" className="inline-block">
-          <Logo size={110} className="mx-auto" />
+          <Logo size={150} priority className="mx-auto" />
         </Link>
         <h1 className="mt-6 text-2xl font-bold">Enter your join code</h1>
         <p className="mt-1 text-sm text-rahoot-muted">

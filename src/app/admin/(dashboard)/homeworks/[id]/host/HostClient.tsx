@@ -10,6 +10,7 @@ import type {
   LivePlayer,
 } from "@/lib/socket-events";
 import { Leaderboard } from "@/components/Leaderboard";
+import { optionPalette } from "@/components/AnswerTiles";
 
 type Phase = "connecting" | "lobby" | "question" | "reveal" | "finished";
 
@@ -169,19 +170,27 @@ export function HostClient({
           <p className="text-sm font-bold uppercase tracking-wide text-rahoot-muted">Results</p>
           {reveal.type === "MULTIPLE_CHOICE" && (
             <div className="mt-4 w-full max-w-md text-left">
-              {Object.entries(reveal.optionCounts).map(([optionId, count]) => (
-                <div
-                  key={optionId}
-                  className={`mb-2 rounded-lg border p-2 text-sm font-semibold ${
-                    optionId === reveal.correctOptionId
-                      ? "border-green-600 bg-green-50 text-green-800"
-                      : "border-rahoot-border"
-                  }`}
-                >
-                  {count} answer{count === 1 ? "" : "s"}
-                  {optionId === reveal.correctOptionId ? " (correct)" : ""}
-                </div>
-              ))}
+              {Object.entries(reveal.optionCounts).map(([optionId, count]) => {
+                // Color-match each bar to the tile students saw while
+                // answering, using the last-known question's option order
+                // (still in state - onReveal doesn't clear it).
+                const optionIndex = question?.options.findIndex((o) => o.id === optionId) ?? -1;
+                const palette = optionPalette(Math.max(optionIndex, 0));
+                const isCorrect = optionId === reveal.correctOptionId;
+                return (
+                  <div
+                    key={optionId}
+                    className={`mb-2 flex items-center gap-3 rounded-lg p-2 text-sm font-semibold ${palette.base} ${palette.text} ${
+                      isCorrect ? "ring-4 ring-green-500" : ""
+                    }`}
+                  >
+                    <span>
+                      {count} answer{count === 1 ? "" : "s"}
+                      {isCorrect ? " (correct)" : ""}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           )}
           {reveal.type === "PARAGRAPH" && (

@@ -3,6 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getStudentForHomework } from "@/lib/student-session";
 import { submitAsyncAnswer } from "../../actions";
+import { AsyncOptions } from "./AsyncOptions";
 
 export default async function AsyncQuestionPage({
   params,
@@ -42,21 +43,10 @@ export default async function AsyncQuestionPage({
 
       <form action={action} className="mt-8 flex flex-col gap-3">
         {question.type === "MULTIPLE_CHOICE" ? (
-          question.options.map((opt) => (
-            <label
-              key={opt.id}
-              className="card flex cursor-pointer items-center gap-3 p-4 has-[:checked]:border-rahoot-red has-[:checked]:bg-rahoot-red-light"
-            >
-              <input
-                type="radio"
-                name="optionId"
-                value={opt.id}
-                required
-                defaultChecked={existingAnswer?.selectedOptionId === opt.id}
-              />
-              <span className="font-medium">{opt.text}</span>
-            </label>
-          ))
+          <AsyncOptions
+            options={question.options}
+            defaultSelectedId={existingAnswer?.selectedOptionId ?? null}
+          />
         ) : (
           <textarea
             name="textAnswer"
@@ -78,9 +68,11 @@ export default async function AsyncQuestionPage({
           ) : (
             <span />
           )}
-          <button type="submit" className="btn btn-primary">
-            {isLast ? "Finish" : "Next"}
-          </button>
+          {question.type === "PARAGRAPH" && (
+            <button type="submit" className="btn btn-primary">
+              {isLast ? "Finish" : "Next"}
+            </button>
+          )}
         </div>
       </form>
     </div>

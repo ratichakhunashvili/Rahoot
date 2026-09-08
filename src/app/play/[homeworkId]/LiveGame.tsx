@@ -10,6 +10,7 @@ import type {
   YourResultPayload,
 } from "@/lib/socket-events";
 import { Leaderboard } from "@/components/Leaderboard";
+import { OptionGrid, OptionTile } from "@/components/AnswerTiles";
 
 type Phase = "connecting" | "lobby" | "question" | "reveal" | "finished";
 
@@ -95,16 +96,26 @@ export function LiveGame({
     return () => clearInterval(interval);
   }, [phase, question]);
 
-  function submitAnswer() {
-    if (!question || hasAnswered) return;
-    if (question.type === "MULTIPLE_CHOICE" && !selectedOptionId) return;
-    if (question.type === "PARAGRAPH" && !textAnswer.trim()) return;
-
+  // Multiple choice submits the instant a tile is tapped - no separate
+  // submit step. Paragraph answers still need an explicit submit since
+  // there's no single "click" that means "this is my answer" for free text.
+  function selectMultipleChoice(optionId: string) {
+    if (!question || hasAnswered || question.type !== "MULTIPLE_CHOICE") return;
+    setSelectedOptionId(optionId);
+    setHasAnswered(true);
     getSocket().emit("student:answer", {
       homeworkId,
       questionId: question.questionId,
-      selectedOptionId: selectedOptionId ?? undefined,
-      textAnswer: question.type === "PARAGRAPH" ? textAnswer : undefined,
+      selectedOptionId: optionId,
+    });
+  }
+
+  function submitParagraph() {
+    if (!question || hasAnswered || question.type !== "PARAGRAPH" || !textAnswer.trim()) return;
+    getSocket().emit("student:answer", {
+      homeworkId,
+      questionId: question.questionId,
+      textAnswer,
     });
     setHasAnswered(true);
   }
@@ -158,48 +169,51 @@ export function LiveGame({
         </div>
         <h1 className="mt-3 text-center text-xl font-bold">{question.text}</h1>
 
-        {hasAnswered ? (
+        {question.type === "MULTIPLE_CHOICE" ? (
+          <>
+            <div className="mt-8">
+              <OptionGrid>
+                {question.options.map((opt, i) => (
+                  <OptionTile
+                    key={opt.id}
+                    index={i}
+                    onClick={() => selectMultipleChoice(opt.id)}
+                    state={!hasAnswered ? "idle" : opt.id === selectedOptionId ? "selected" : "dimmed"}
+                  >
+                    {opt.text}
+                  </OptionTile>
+                ))}
+              </OptionGrid>
+            </div>
+            {hasAnswered && (
+              <p className="mt-4 text-center text-sm font-semibold text-rahoot-muted">
+                Locked in - waiting for the others...
+              </p>
+            )}
+          </>
+        ) : hasAnswered ? (
           <p className="mt-8 text-center font-semibold text-rahoot-muted">
             Answer locked in - waiting for the others...
           </p>
-        ) : question.type === "MULTIPLE_CHOICE" ? (
-          <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {question.options.map((opt, i) => (
-              <button
-                key={opt.id}
-                onClick={() => setSelectedOptionId(opt.id)}
-                className={`card p-4 text-left font-semibold ${
-                  selectedOptionId === opt.id
-                    ? "border-rahoot-red bg-rahoot-red-light"
-                    : ""
-                }`}
-              >
-                {["A", "B", "C", "D"][i]}. {opt.text}
-              </button>
-            ))}
-          </div>
         ) : (
-          <textarea
-            value={textAnswer}
-            onChange={(e) => setTextAnswer(e.target.value)}
-            rows={5}
-            maxLength={5000}
-            placeholder="Type your answer..."
-            className="input mt-8"
-            autoFocus
-          />
-        )}
-
-        {!hasAnswered && (
-          <button
-            onClick={submitAnswer}
-            disabled={
-              question.type === "MULTIPLE_CHOICE" ? !selectedOptionId : !textAnswer.trim()
-            }
-            className="btn btn-primary mt-6"
-          >
-            Submit answer
-          </button>
+          <>
+            <textarea
+              value={textAnswer}
+              onChange={(e) => setTextAnswer(e.target.value)}
+              rows={5}
+              maxLength={5000}
+              placeholder="Type your answer..."
+              className="input mt-8"
+              autoFocus
+            />
+            <button
+              onClick={submitParagraph}
+              disabled={!textAnswer.trim()}
+              className="btn btn-primary mt-6"
+            >
+              Submit answer
+            </button>
+          </>
         )}
       </div>
     );

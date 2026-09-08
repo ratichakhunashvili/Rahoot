@@ -14,8 +14,14 @@ import type {
 } from "./src/lib/socket-events";
 
 const port = parseInt(process.env.PORT || "3000", 10);
+const hostname = process.env.HOSTNAME || "0.0.0.0";
 const dev = process.env.NODE_ENV !== "production";
-const app = next({ dev });
+// Passing hostname/port explicitly matters here: without it, Next's own
+// internal self-fetches (e.g. resolving a Server Action's redirect target)
+// assume the default port 3000 regardless of what this server actually
+// listens on, which silently breaks redirects (like the admin login
+// action's) whenever PORT is set to anything else - as it is on Cloud Run.
+const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
 type SocketData = {

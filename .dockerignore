@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+.env
+.env.*
+.neon
+.claude
+_scratch_check.ts
+e2e
+deploy
+README.md

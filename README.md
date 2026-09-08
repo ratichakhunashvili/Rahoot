@@ -59,13 +59,69 @@ It creates throwaway homeworks/students, so only point it at a local/dev databas
 
 ## Deploying
 
-Because of the persistent Socket.IO connections, **this app needs a host that runs a normal long-lived Node process** - Railway, Render, Fly.io, or your own VPS all work well. Plain Vercel-style serverless functions do not support the live-mode WebSocket connections.
+Because of the persistent Socket.IO connections, **this app needs a host that runs a normal long-lived Node process**. Plain Vercel-style serverless functions do not support the live-mode WebSocket connections. Two paths, depending on whether you want zero setup or zero cost - host pricing/free tiers change often, so double-check current terms before committing, but as of writing:
 
-1. Provision a **hosted Postgres** database (Neon, Supabase, Railway/Render's managed Postgres, etc.) and set `DATABASE_URL` to it. Keep (or add) `?pgbouncer=true` on the connection string if your provider gives you a pooled connection URL - see the comment in `.env.example`.
+- **Render's free tier does not support WebSockets** (long-lived connections are a paid-plan feature there) - a dead end for this app.
+- **Railway and Fly.io no longer have a real free tier** (trial credit only, then billed).
+- **Koyeb** currently has a genuinely free web service that does support WebSockets - the only catch is it scales to zero after an hour with no traffic, so the first visitor after a lull waits ~10-20s for a cold start. Fine for a classroom tool used in bursts.
+
+### Managed platform (Koyeb, Railway, Render, Fly.io, ...)
+
+1. Provision a **hosted Postgres** database ([Neon](https://neon.com)'s free tier works well) and set `DATABASE_URL` to it. Keep `pgbouncer=true&connection_limit=5` on the connection string (see the comment in `.env.example`) - free/pooled Postgres tiers cap concurrent connections, and a live round's burst of simultaneous queries can exceed an uncapped default pool.
 2. Set `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and a fresh random `SESSION_SECRET` (`openssl rand -base64 32`) in the host's environment variables - **don't reuse the local dev secret in production.**
 3. Set `NEXT_PUBLIC_BASE_URL` to the public URL the host gives you (students' phones must be able to reach it).
 4. Set the build command to `npm run build` (this also runs `prisma generate` via `postinstall`, and `prisma migrate deploy` should be run once against the production database - most hosts let you run this as a one-off release command).
 5. Set the start command to `npm start`.
+
+### Self-hosting on a free VM (e.g. Oracle Cloud "Always Free")
+
+No cold starts, but real setup work - you're the sysadmin. `deploy/rahoot.service` and `deploy/Caddyfile` in this repo are ready-to-copy templates for steps 6-7.
+
+1. **Create the VM.** Sign up for Oracle Cloud, then Compute → Instances → Create Instance. Change the shape to **Ampere → VM.Standard.A1.Flex** and set it to the full Always Free allowance (4 OCPU / 24GB RAM). Ubuntu is the simplest image to follow the rest of these steps with. The free Ampere shape's availability varies by region and moment - if creation fails with an out-of-capacity error, retry or try another region.
+2. **Open the ports**, or requests never reach the VM:
+   - OCI console: the VM's subnet → Security Lists (or a Network Security Group) → add ingress rules for TCP 80 and 443 from `0.0.0.0/0` (22 for SSH should already be there).
+   - On the VM itself, Ubuntu images on OCI ship with `iptables` blocking everything but SSH by default:
+     ```bash
+     sudo apt install -y iptables-persistent
+     sudo iptables -I INPUT -p tcp --dport 80 -j ACCEPT
+     sudo iptables -I INPUT -p tcp --dport 443 -j ACCEPT
+     sudo netfilter-persistent save
+     ```
+3. **Point a domain at it** - an A record to the VM's public IP. You need a real domain for HTTPS; Caddy (step 6) gets you a certificate automatically, but only for one.
+4. **Install Node**, SSH'd into the VM:
+   ```bash
+   curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+   sudo apt install -y nodejs git
+   ```
+5. **Clone and configure the app:**
+   ```bash
+   git clone <your fork's URL> rahoot
+   cd rahoot
+   cp .env.example .env
+   nano .env   # DATABASE_URL (e.g. Neon), ADMIN_EMAIL/PASSWORD, a fresh SESSION_SECRET, NEXT_PUBLIC_BASE_URL=https://your-domain
+   npm ci
+   npm run build
+   npx prisma migrate deploy
+   ```
+6. **Run it as a service** so it survives SSH disconnects and reboots:
+   ```bash
+   sudo cp deploy/rahoot.service /etc/systemd/system/rahoot.service
+   # edit WorkingDirectory / ExecStart in it if your paths differ
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now rahoot
+   ```
+7. **Put HTTPS in front of it with Caddy** (auto-provisions and renews the Let's Encrypt cert):
+   ```bash
+   sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
+   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+   sudo apt update && sudo apt install -y caddy
+   sudo cp deploy/Caddyfile /etc/caddy/Caddyfile   # edit the domain in it first
+   sudo systemctl reload caddy
+   ```
+8. Visit `https://your-domain`, log in as admin, and host a test round from two devices to confirm the WebSocket connection works end-to-end through Caddy.
+
+To ship a code update later: `git pull`, `npm ci`, `npm run build`, `sudo systemctl restart rahoot`.
 
 ## How scoring works
 

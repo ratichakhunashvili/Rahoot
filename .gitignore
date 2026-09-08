@@ -42,4 +42,6 @@ next-env.d.ts
 
 /src/generated/prisma
 
-/src/generated/prisma
+# claude code local settings (personal, not team policy)
+.claude/settings.local.json
+.neon

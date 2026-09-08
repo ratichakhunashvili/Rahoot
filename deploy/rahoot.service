@@ -1,0 +1,36 @@
+# systemd unit for running Rahoot's custom Node/Socket.IO server as a
+# background service that survives SSH disconnects and VM reboots.
+#
+# Install:
+#   sudo cp deploy/rahoot.service /etc/systemd/system/rahoot.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now rahoot
+#
+# Logs:
+#   journalctl -u rahoot -f
+#
+# After pulling new code:
+#   npm ci && npm run build && sudo systemctl restart rahoot
+#
+# Note: no EnvironmentFile here on purpose. Next.js (via the `next()` call
+# in server.ts) loads `.env` from the working directory itself, the same
+# way it does in `npm run dev` - so a plain `.env` file next to package.json
+# (per the README's "Configure environment variables" step) is all you need.
+
+[Unit]
+Description=Rahoot quiz app
+After=network.target
+
+[Service]
+Type=simple
+# Adjust to wherever you clone the repo.
+WorkingDirectory=/home/ubuntu/rahoot
+# Run `which npm` on the VM and paste the result here if this path is wrong
+# for your Node install (differs between nvm, NodeSource, snap, etc).
+ExecStart=/usr/bin/npm start
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

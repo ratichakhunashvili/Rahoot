@@ -1,0 +1,20 @@
+# Reverse proxy + automatic HTTPS (Let's Encrypt) in front of the Node
+# server. Caddy renews certs on its own - nothing else to maintain.
+#
+# Install:
+#   sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
+#   # edit the domain below first
+#   sudo systemctl reload caddy
+#
+# Requires ports 80 and 443 open in BOTH the Oracle Cloud security list/NSG
+# and the VM's own firewall (see the deploy guide) - Caddy needs 80 to do
+# the Let's Encrypt HTTP challenge, then serves on 443.
+
+your-domain.example.com {
+	reverse_proxy localhost:3000
+
+	# Socket.IO's long-lived WebSocket connections need this - Caddy proxies
+	# WebSocket upgrades transparently once reverse_proxy is set, no extra
+	# config required, but keeping this comment here as a reminder if you
+	# ever swap Caddy for a proxy that needs it spelled out explicitly.
+}

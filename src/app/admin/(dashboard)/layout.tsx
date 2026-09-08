@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAdminSession } from "@/lib/session";
-import { LogoMark } from "@/components/Logo";
+import { Logo } from "@/components/Logo";
 import { logout } from "./actions";
 
 // Second line of defense behind proxy.ts (see the Next.js auth guide's
@@ -19,9 +19,9 @@ export default async function AdminDashboardLayout({
     <div className="flex min-h-full flex-1 flex-col">
       <header className="border-b-4 border-rahoot-red bg-rahoot-surface">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-          <Link href="/admin" className="flex items-center gap-2 text-2xl font-black text-rahoot-red">
-            <LogoMark size={26} />
-            Rahoot <span className="text-rahoot-ink">admin</span>
+          <Link href="/admin" className="flex items-center gap-2">
+            <Logo size={44} priority />
+            <span className="text-xl font-black text-rahoot-ink">admin</span>
           </Link>
           <form action={logout}>
             <button type="submit" className="btn btn-outline !py-2 !px-4 text-sm">

@@ -1,15 +1,13 @@
 import Link from "next/link";
-import { LogoMark } from "@/components/Logo";
+import { Logo } from "@/components/Logo";
 
 export default function Home() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center bg-rahoot-red px-6 py-16 text-[#1a1005]">
       <div className="w-full max-w-md text-center">
-        <div className="flex items-center justify-center gap-3">
-          <LogoMark size={56} variant="bolt" />
-          <h1 className="text-6xl font-black tracking-tight">Rahoot</h1>
-        </div>
-        <p className="mt-3 text-lg text-[#1a1005]/70">
+        <h1 className="sr-only">Rahoot</h1>
+        <Logo size={220} priority className="shadow-lg" />
+        <p className="mt-5 text-lg text-[#1a1005]/70">
           Scan the QR code your teacher shows you to jump straight in.
         </p>
 

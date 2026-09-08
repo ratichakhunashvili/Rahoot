@@ -74,14 +74,16 @@ export default async function ManageHomeworkPage({
       <section className="card p-6">
         <h2 className="font-bold">Join code &amp; QR</h2>
         <div className="mt-4 flex flex-wrap items-center gap-6">
-          <Image
-            src={qrDataUrl}
-            alt={`QR code to join ${homework.title}`}
-            width={200}
-            height={200}
-            unoptimized
-            className="rounded-lg border-4 border-rahoot-red-light"
-          />
+          <div className="inline-block rounded-2xl border-4 border-rahoot-red bg-white p-3">
+            <Image
+              src={qrDataUrl}
+              alt={`QR code to join ${homework.title}`}
+              width={200}
+              height={200}
+              unoptimized
+              className="rounded-md"
+            />
+          </div>
           <div>
             <p className="text-sm text-rahoot-muted">Join code</p>
             <p className="font-mono text-3xl font-black tracking-widest">{homework.joinCode}</p>

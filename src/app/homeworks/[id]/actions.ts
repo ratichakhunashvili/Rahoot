@@ -1,52 +1,58 @@
 "use server";
 
-import { redirect } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { canManageHomework } from "@/lib/homework-auth";
 import { getAdminSession } from "@/lib/session";
 import type { HomeworkStatus, QuestionType } from "@/generated/prisma/client";
 
-async function requireAdmin() {
-  const session = await getAdminSession();
-  if (!session) redirect("/admin/login");
+// Doesn't redirect to /admin/login - unlike admin auth, failing this check
+// doesn't mean "you're not logged in as admin", it means "this isn't your
+// homework" (a public creator's cookie not matching, or no cookie at all).
+// notFound() is the honest response either way.
+async function requireManage(homeworkId: string) {
+  if (!(await canManageHomework(homeworkId))) notFound();
 }
 
 export async function updateHomeworkDetails(
   homeworkId: string,
   formData: FormData
 ) {
-  await requireAdmin();
+  await requireManage(homeworkId);
   const title = String(formData.get("title") || "").trim();
   const description = String(formData.get("description") || "").trim();
-  if (!title) redirect(`/admin/homeworks/${homeworkId}?error=title`);
+  if (!title) redirect(`/homeworks/${homeworkId}?error=title`);
 
   await prisma.homework.update({
     where: { id: homeworkId },
     data: { title, description: description || null },
   });
-  revalidatePath(`/admin/homeworks/${homeworkId}`);
-  redirect(`/admin/homeworks/${homeworkId}`);
+  revalidatePath(`/homeworks/${homeworkId}`);
+  redirect(`/homeworks/${homeworkId}`);
 }
 
 const VALID_STATUSES: HomeworkStatus[] = ["DRAFT", "OPEN", "CLOSED"];
 
 export async function setHomeworkStatus(homeworkId: string, status: string) {
-  await requireAdmin();
+  await requireManage(homeworkId);
   if (!VALID_STATUSES.includes(status as HomeworkStatus)) return;
 
   await prisma.homework.update({
     where: { id: homeworkId },
     data: { status: status as HomeworkStatus },
   });
-  revalidatePath(`/admin/homeworks/${homeworkId}`);
+  revalidatePath(`/homeworks/${homeworkId}`);
   revalidatePath("/admin");
 }
 
 export async function deleteHomework(homeworkId: string) {
-  await requireAdmin();
+  await requireManage(homeworkId);
+  const isAdmin = !!(await getAdminSession());
   await prisma.homework.delete({ where: { id: homeworkId } });
   revalidatePath("/admin");
-  redirect("/admin");
+  revalidatePath("/my-homeworks");
+  redirect(isAdmin ? "/admin" : "/my-homeworks");
 }
 
 type QuestionFormValues = {
@@ -84,10 +90,10 @@ function parseQuestionForm(formData: FormData): QuestionFormValues | { error: st
 }
 
 export async function createQuestion(homeworkId: string, formData: FormData) {
-  await requireAdmin();
+  await requireManage(homeworkId);
   const parsed = parseQuestionForm(formData);
   if ("error" in parsed) {
-    redirect(`/admin/homeworks/${homeworkId}/questions/new?error=${parsed.error}`);
+    redirect(`/homeworks/${homeworkId}/questions/new?error=${parsed.error}`);
   }
 
   const count = await prisma.question.count({ where: { homeworkId } });
@@ -110,8 +116,8 @@ export async function createQuestion(homeworkId: string, formData: FormData) {
     },
   });
 
-  revalidatePath(`/admin/homeworks/${homeworkId}`);
-  redirect(`/admin/homeworks/${homeworkId}`);
+  revalidatePath(`/homeworks/${homeworkId}`);
+  redirect(`/homeworks/${homeworkId}`);
 }
 
 export async function updateQuestion(
@@ -119,11 +125,11 @@ export async function updateQuestion(
   questionId: string,
   formData: FormData
 ) {
-  await requireAdmin();
+  await requireManage(homeworkId);
   const parsed = parseQuestionForm(formData);
   if ("error" in parsed) {
     redirect(
-      `/admin/homeworks/${homeworkId}/questions/${questionId}/edit?error=${parsed.error}`
+      `/homeworks/${homeworkId}/questions/${questionId}/edit?error=${parsed.error}`
     );
   }
 
@@ -147,13 +153,13 @@ export async function updateQuestion(
     }),
   ]);
 
-  revalidatePath(`/admin/homeworks/${homeworkId}`);
-  redirect(`/admin/homeworks/${homeworkId}`);
+  revalidatePath(`/homeworks/${homeworkId}`);
+  redirect(`/homeworks/${homeworkId}`);
 }
 
 export async function deleteQuestion(homeworkId: string, questionId: string) {
-  await requireAdmin();
+  await requireManage(homeworkId);
   await prisma.question.delete({ where: { id: questionId } });
-  revalidatePath(`/admin/homeworks/${homeworkId}`);
-  redirect(`/admin/homeworks/${homeworkId}`);
+  revalidatePath(`/homeworks/${homeworkId}`);
+  redirect(`/homeworks/${homeworkId}`);
 }

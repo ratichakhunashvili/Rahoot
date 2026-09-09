@@ -1,16 +1,21 @@
-import { createHomework } from "../../actions";
+import Link from "next/link";
+import { Logo } from "@/components/Logo";
+import { createHomework } from "../actions";
 
 export default async function NewHomeworkPage({
   searchParams,
-}: PageProps<"/admin/homeworks/new">) {
+}: PageProps<"/homeworks/new">) {
   const params = await searchParams;
   const hasError = params?.error === "title";
 
   return (
-    <div className="mx-auto max-w-lg">
-      <h1 className="text-2xl font-bold">New homework</h1>
-      <p className="mt-1 text-sm text-rahoot-muted">
-        Choose how students will play it - you can add questions after creating it.
+    <div className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-6 py-10">
+      <Link href="/" className="mx-auto">
+        <Logo size={90} priority />
+      </Link>
+      <h1 className="mt-6 text-center text-2xl font-bold">New homework</h1>
+      <p className="mt-1 text-center text-sm text-rahoot-muted">
+        No account needed - name it, and this browser will remember it&apos;s yours to manage.
       </p>
 
       <form action={createHomework} className="card mt-6 flex flex-col gap-4 p-6">

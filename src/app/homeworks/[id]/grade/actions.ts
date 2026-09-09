@@ -1,17 +1,16 @@
 "use server";
 
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getAdminSession } from "@/lib/session";
+import { canManageHomework } from "@/lib/homework-auth";
 
 export async function gradeAnswer(
   homeworkId: string,
   answerId: string,
   formData: FormData
 ) {
-  const session = await getAdminSession();
-  if (!session) redirect("/admin/login");
+  if (!(await canManageHomework(homeworkId))) notFound();
 
   const verdict = String(formData.get("verdict") || "");
   const points = Math.max(0, Number(formData.get("points")) || 0);
@@ -26,6 +25,6 @@ export async function gradeAnswer(
     },
   });
 
-  revalidatePath(`/admin/homeworks/${homeworkId}/grade`);
-  revalidatePath(`/admin/homeworks/${homeworkId}/leaderboard`);
+  revalidatePath(`/homeworks/${homeworkId}/grade`);
+  revalidatePath(`/homeworks/${homeworkId}/leaderboard`);
 }

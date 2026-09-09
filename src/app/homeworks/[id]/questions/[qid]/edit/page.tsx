@@ -7,7 +7,7 @@ import { QuestionForm, type QuestionDefaults } from "../../QuestionForm";
 export default async function EditQuestionPage({
   params,
   searchParams,
-}: PageProps<"/admin/homeworks/[id]/questions/[qid]/edit">) {
+}: PageProps<"/homeworks/[id]/questions/[qid]/edit">) {
   const { id, qid } = await params;
   const search = await searchParams;
   const error = typeof search?.error === "string" ? search.error : null;
@@ -34,7 +34,7 @@ export default async function EditQuestionPage({
 
   return (
     <div className="mx-auto max-w-lg">
-      <Link href={`/admin/homeworks/${id}`} className="text-sm text-rahoot-red hover:underline">
+      <Link href={`/homeworks/${id}`} className="text-sm text-rahoot-red hover:underline">
         &larr; Back to homework
       </Link>
       <h1 className="mt-2 text-2xl font-bold">Edit question</h1>

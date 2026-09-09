@@ -16,9 +16,12 @@ import { SignJWT, jwtVerify } from "jose";
 // into that one slot instead of one cookie per concern.
 
 const SESSION_COOKIE_NAME = "__session";
-const ENVELOPE_TTL = "30d"; // outer JWT expiry - also the effective cap on how long a student session can last
+const ENVELOPE_TTL = "30d"; // outer JWT expiry - also the effective cap on how long a student/creator session can last
 const ADMIN_TTL_SECONDS = 60 * 60 * 12; // admin's own, shorter-lived expiry, checked separately below
-const MAX_STUDENT_ENTRIES = 20; // safety cap so the cookie can't grow past the ~4KB browser limit
+// Safety caps so the cookie can't grow past the ~4KB browser limit - kept
+// modest since both maps share the same cookie.
+const MAX_STUDENT_ENTRIES = 15;
+const MAX_CREATOR_ENTRIES = 15;
 
 function getSecretKey() {
   const secret = process.env.SESSION_SECRET;
@@ -35,6 +38,10 @@ export type SessionEnvelope = {
   // Keyed by homeworkId - a student can be mid-way through several
   // different homeworks at once, each needing its own entry.
   students?: Record<string, StudentSessionEntry>;
+  // Keyed by homeworkId -> that homework's creatorToken. Lets someone who
+  // created a homework with no registration manage (edit, add questions,
+  // host) only the ones they made, verified against Homework.creatorToken.
+  creators?: Record<string, string>;
 };
 
 export function sessionCookieName() {
@@ -75,21 +82,36 @@ export function adminFromEnvelope(envelope: SessionEnvelope): AdminSessionPayloa
   return { email: admin.email };
 }
 
-/** Merges in a student entry, evicting the oldest one first if that would push the count over MAX_STUDENT_ENTRIES. */
+/** Merges `value` into `map` under `key`, evicting the oldest entry first if that would push the count over `max`. Object key insertion order is preserved for string keys, so the first remaining key is the oldest. */
+function withCappedEntry<T>(
+  map: Record<string, T> | undefined,
+  key: string,
+  value: T,
+  max: number
+): Record<string, T> {
+  const next = { ...map, [key]: value };
+  const keys = Object.keys(next);
+  if (keys.length > max) {
+    const oldest = keys.find((k) => k !== key);
+    if (oldest) delete next[oldest];
+  }
+  return next;
+}
+
 export function withStudentEntry(
   envelope: SessionEnvelope,
   homeworkId: string,
   entry: StudentSessionEntry
 ): SessionEnvelope {
-  const students = { ...envelope.students, [homeworkId]: entry };
-  const keys = Object.keys(students);
-  if (keys.length > MAX_STUDENT_ENTRIES) {
-    // Object key insertion order is preserved for string keys, so the
-    // first key is the oldest entry (unless it's the one we just set).
-    const oldest = keys.find((k) => k !== homeworkId);
-    if (oldest) delete students[oldest];
-  }
-  return { ...envelope, students };
+  return { ...envelope, students: withCappedEntry(envelope.students, homeworkId, entry, MAX_STUDENT_ENTRIES) };
+}
+
+export function withCreatorEntry(
+  envelope: SessionEnvelope,
+  homeworkId: string,
+  creatorToken: string
+): SessionEnvelope {
+  return { ...envelope, creators: withCappedEntry(envelope.creators, homeworkId, creatorToken, MAX_CREATOR_ENTRIES) };
 }
 
 // --- Backward-compatible admin-only surface, used by server.ts (raw

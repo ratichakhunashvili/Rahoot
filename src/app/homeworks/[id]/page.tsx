@@ -20,7 +20,7 @@ const STATUS_FLOW: Array<{ value: "DRAFT" | "OPEN" | "CLOSED"; label: string; hi
 export default async function ManageHomeworkPage({
   params,
   searchParams,
-}: PageProps<"/admin/homeworks/[id]">) {
+}: PageProps<"/homeworks/[id]">) {
   const { id } = await params;
   const search = await searchParams;
   const detailsError = search?.error === "title";
@@ -56,16 +56,16 @@ export default async function ManageHomeworkPage({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Link href={`/admin/homeworks/${homework.id}/leaderboard`} className="btn btn-outline">
+          <Link href={`/homeworks/${homework.id}/leaderboard`} className="btn btn-outline">
             Leaderboard
           </Link>
           {hasParagraphQuestions && (
-            <Link href={`/admin/homeworks/${homework.id}/grade`} className="btn btn-outline">
+            <Link href={`/homeworks/${homework.id}/grade`} className="btn btn-outline">
               Grade answers
             </Link>
           )}
           {homework.mode === "LIVE" && (
-            <Link href={`/admin/homeworks/${homework.id}/host`} className="btn btn-primary">
+            <Link href={`/homeworks/${homework.id}/host`} className="btn btn-primary">
               Host live session
             </Link>
           )}
@@ -153,7 +153,7 @@ export default async function ManageHomeworkPage({
           <h2 className="font-bold">
             Questions <span className="font-normal text-rahoot-muted">({homework.questions.length})</span>
           </h2>
-          <Link href={`/admin/homeworks/${homework.id}/questions/new`} className="btn btn-primary">
+          <Link href={`/homeworks/${homework.id}/questions/new`} className="btn btn-primary">
             + Add question
           </Link>
         </div>
@@ -177,7 +177,7 @@ export default async function ManageHomeworkPage({
                   </div>
                   <div className="flex shrink-0 gap-2">
                     <Link
-                      href={`/admin/homeworks/${homework.id}/questions/${q.id}/edit`}
+                      href={`/homeworks/${homework.id}/questions/${q.id}/edit`}
                       className="btn btn-outline !py-1.5 !px-3 text-sm"
                     >
                       Edit

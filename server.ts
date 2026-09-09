@@ -2,7 +2,11 @@ import { createServer } from "node:http";
 import next from "next";
 import { Server as SocketIOServer, type Socket } from "socket.io";
 import { prisma } from "./src/lib/prisma";
-import { verifyAdminToken, adminSessionCookieName } from "./src/lib/session-core";
+import {
+  adminSessionCookieName,
+  verifySessionEnvelope,
+  adminFromEnvelope,
+} from "./src/lib/session-core";
 import { computeMultipleChoicePoints, getLeaderboard } from "./src/lib/scoring";
 import type {
   ClientToServerEvents,
@@ -319,8 +323,26 @@ app.prepare().then(() => {
     socket.on("host:join", async ({ homeworkId }, ack) => {
       try {
         const token = parseCookie(socket.handshake.headers.cookie, adminSessionCookieName());
-        const session = token ? await verifyAdminToken(token) : null;
-        if (!session) {
+        const envelope = token ? await verifySessionEnvelope(token) : {};
+        const admin = adminFromEnvelope(envelope);
+
+        // Admin can host anything; otherwise this socket needs a creator
+        // token matching THIS homework's own (same trust model as every
+        // other homework-management check - see homework-auth.ts, which
+        // this mirrors since server.ts can't use next/headers).
+        let authorized = !!admin;
+        if (!authorized) {
+          const creatorToken = envelope.creators?.[homeworkId];
+          if (creatorToken) {
+            const homework = await prisma.homework.findUnique({
+              where: { id: homeworkId },
+              select: { creatorToken: true },
+            });
+            authorized = !!homework && homework.creatorToken === creatorToken;
+          }
+        }
+
+        if (!authorized) {
           ack(false, "Not authorized");
           return;
         }

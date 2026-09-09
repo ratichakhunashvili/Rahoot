@@ -36,7 +36,7 @@ export function HostClient({
 
     socket.emit("host:join", { homeworkId }, (ok, err) => {
       if (!ok) {
-        setError(err ?? "Could not host this session. Are you logged in as admin?");
+        setError(err ?? "Could not host this session - this browser doesn't have access to it.");
         return;
       }
       setPhase((p) => (p === "connecting" ? "lobby" : p));
@@ -112,7 +112,7 @@ export function HostClient({
     return (
       <Centered>
         <p className="font-semibold text-rahoot-red">{error}</p>
-        <Link href={`/admin/homeworks/${homeworkId}`} className="btn btn-outline mt-4">
+        <Link href={`/homeworks/${homeworkId}`} className="btn btn-outline mt-4">
           Back
         </Link>
       </Centered>
@@ -126,7 +126,7 @@ export function HostClient({
           <p className="text-sm font-bold uppercase tracking-wide text-rahoot-red">Hosting</p>
           <h1 className="text-xl font-bold">{title}</h1>
         </div>
-        <Link href={`/admin/homeworks/${homeworkId}`} className="btn btn-outline !py-1.5 !px-3 text-sm">
+        <Link href={`/homeworks/${homeworkId}`} className="btn btn-outline !py-1.5 !px-3 text-sm">
           Exit
         </Link>
       </div>
@@ -232,7 +232,7 @@ export function HostClient({
             <Leaderboard entries={finished.leaderboard} />
           </div>
           <div className="mt-8 flex gap-3">
-            <Link href={`/admin/homeworks/${homeworkId}`} className="btn btn-outline">
+            <Link href={`/homeworks/${homeworkId}`} className="btn btn-outline">
               Back to homework
             </Link>
             <button onClick={restart} className="btn btn-primary">

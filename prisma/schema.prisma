@@ -44,6 +44,13 @@ model Homework {
   // Short, human-typeable code (also encoded in the QR link) students use to join
   joinCode String @unique
 
+  // Opaque secret handed to whoever creates the homework (admin or a public,
+  // unregistered creator) and stored in their session cookie, the same way
+  // Student.clientToken works - it's what lets a non-admin creator manage
+  // (edit, add questions, host) only the homeworks they made. Null on rows
+  // that predate this - those are only manageable by admin.
+  creatorToken String?
+
   // Live-session state (ignored for ASYNC homework)
   livePhase           LivePhase? @default(LOBBY)
   currentQuestionIndex Int?

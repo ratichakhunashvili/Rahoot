@@ -58,35 +58,35 @@ async function run() {
   await anonCtx.close();
 
   // ================= ASYNC HOMEWORK FLOW =================
-  await admin.goto(`${BASE}/admin/homeworks/new`);
+  await admin.goto(`${BASE}/homeworks/new`);
   await admin.fill('input[name="title"]', "Async Smoke Test");
   // ASYNC is default-checked
   await Promise.all([
-    admin.waitForURL(/\/admin\/homeworks\/(?!new)[^/]+$/),
+    admin.waitForURL(/\/homeworks\/(?!new)[^/]+$/),
     admin.click('main form button[type="submit"]'),
   ]);
   const asyncHwId = admin.url().split("/").pop();
   ok(`created ASYNC homework (${asyncHwId})`);
 
   // Add MC question
-  await admin.goto(`${BASE}/admin/homeworks/${asyncHwId}/questions/new`);
+  await admin.goto(`${BASE}/homeworks/${asyncHwId}/questions/new`);
   await admin.fill('textarea[name="text"]', "What is 2 + 2?");
   await admin.fill('input[name="opt1"]', "3");
   await admin.fill('input[name="opt2"]', "4");
   await admin.fill('input[name="opt3"]', "5");
   await admin.check('input[name="correct"][value="2"]');
   await Promise.all([
-    admin.waitForURL(`${BASE}/admin/homeworks/${asyncHwId}`),
+    admin.waitForURL(`${BASE}/homeworks/${asyncHwId}`),
     admin.click('main form button[type="submit"]'),
   ]);
   ok("added multiple choice question");
 
   // Add paragraph question
-  await admin.goto(`${BASE}/admin/homeworks/${asyncHwId}/questions/new`);
+  await admin.goto(`${BASE}/homeworks/${asyncHwId}/questions/new`);
   await admin.fill('textarea[name="text"]', "Explain your reasoning.");
   await admin.check('input[name="type"][value="PARAGRAPH"]');
   await Promise.all([
-    admin.waitForURL(`${BASE}/admin/homeworks/${asyncHwId}`),
+    admin.waitForURL(`${BASE}/homeworks/${asyncHwId}`),
     admin.click('main form button[type="submit"]'),
   ]);
   ok("added paragraph question");
@@ -143,7 +143,7 @@ async function run() {
   ok("public leaderboard shows student with pending grading");
 
   // ---------- Admin grades the paragraph answer ----------
-  await admin.goto(`${BASE}/admin/homeworks/${asyncHwId}/grade`);
+  await admin.goto(`${BASE}/homeworks/${asyncHwId}/grade`);
   await assert((await admin.textContent("body")).includes("Because addition works"), "expected pending answer text");
   await admin.check('input[name="verdict"][value="correct"]');
   await admin.fill('input[name="points"]', "500");
@@ -151,7 +151,7 @@ async function run() {
   await admin.waitForSelector("text=Nothing left to grade.");
   ok("admin graded the paragraph answer");
 
-  await admin.goto(`${BASE}/admin/homeworks/${asyncHwId}/leaderboard`);
+  await admin.goto(`${BASE}/homeworks/${asyncHwId}/leaderboard`);
   const adminLbText = await admin.textContent("body");
   await assert(adminLbText.includes("1,500"), "expected total 1500 after grading, got: " + adminLbText);
   ok("leaderboard reflects graded score (1500 total)");
@@ -159,29 +159,29 @@ async function run() {
   await s1Ctx.close();
 
   // ================= LIVE HOMEWORK FLOW =================
-  await admin.goto(`${BASE}/admin/homeworks/new`);
+  await admin.goto(`${BASE}/homeworks/new`);
   await admin.fill('input[name="title"]', "Live Smoke Test");
   await admin.check('input[name="mode"][value="LIVE"]');
   await Promise.all([
-    admin.waitForURL(/\/admin\/homeworks\/(?!new)[^/]+$/),
+    admin.waitForURL(/\/homeworks\/(?!new)[^/]+$/),
     admin.click('main form button[type="submit"]'),
   ]);
   const liveHwId = admin.url().split("/").pop();
   ok(`created LIVE homework (${liveHwId})`);
 
-  await admin.goto(`${BASE}/admin/homeworks/${liveHwId}/questions/new`);
+  await admin.goto(`${BASE}/homeworks/${liveHwId}/questions/new`);
   await admin.fill('textarea[name="text"]', "Capital of France?");
   await admin.fill('input[name="timeLimitSec"]', "6");
   await admin.fill('input[name="opt1"]', "Paris");
   await admin.fill('input[name="opt2"]', "Lyon");
   await admin.check('input[name="correct"][value="1"]');
   await Promise.all([
-    admin.waitForURL(`${BASE}/admin/homeworks/${liveHwId}`),
+    admin.waitForURL(`${BASE}/homeworks/${liveHwId}`),
     admin.click('main form button[type="submit"]'),
   ]);
   ok("added live question");
 
-  await admin.goto(`${BASE}/admin/homeworks/${liveHwId}`);
+  await admin.goto(`${BASE}/homeworks/${liveHwId}`);
   await admin.click('form button:has-text("Open")');
   await admin.waitForSelector('button:disabled:has-text("Open")');
   const liveJoinCode = (await admin.textContent("p.font-mono")).trim();
@@ -202,7 +202,7 @@ async function run() {
 
   const hostPage = await adminCtx.newPage();
   hostPage.on("pageerror", (e) => console.log("  [host pageerror]", e.message));
-  await hostPage.goto(`${BASE}/admin/homeworks/${liveHwId}/host`);
+  await hostPage.goto(`${BASE}/homeworks/${liveHwId}/host`);
   await hostPage.waitForSelector("text=1", { timeout: 10000 }); // player count
   await hostPage.waitForSelector('button:has-text("Start game"):not([disabled])', { timeout: 10000 });
   ok("host sees 1 player in lobby, start enabled");

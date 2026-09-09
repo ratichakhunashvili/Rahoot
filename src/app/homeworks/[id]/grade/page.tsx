@@ -5,7 +5,7 @@ import { gradeAnswer } from "./actions";
 
 export default async function GradeHomeworkPage({
   params,
-}: PageProps<"/admin/homeworks/[id]/grade">) {
+}: PageProps<"/homeworks/[id]/grade">) {
   const { id } = await params;
   const homework = await prisma.homework.findUnique({ where: { id } });
   if (!homework) notFound();
@@ -25,7 +25,7 @@ export default async function GradeHomeworkPage({
 
   return (
     <div className="mx-auto max-w-2xl">
-      <Link href={`/admin/homeworks/${id}`} className="text-sm text-rahoot-red hover:underline">
+      <Link href={`/homeworks/${id}`} className="text-sm text-rahoot-red hover:underline">
         &larr; Back to homework
       </Link>
       <h1 className="mt-2 text-2xl font-bold">{homework.title} - Grade answers</h1>

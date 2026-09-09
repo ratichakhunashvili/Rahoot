@@ -4,7 +4,7 @@ import { HostClient } from "./HostClient";
 
 export default async function HostLivePage({
   params,
-}: PageProps<"/admin/homeworks/[id]/host">) {
+}: PageProps<"/homeworks/[id]/host">) {
   const { id } = await params;
   const homework = await prisma.homework.findUnique({
     where: { id },

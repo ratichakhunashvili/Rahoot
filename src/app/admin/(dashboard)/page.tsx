@@ -17,7 +17,7 @@ export default async function AdminHomePage() {
     <div>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Homeworks</h1>
-        <Link href="/admin/homeworks/new" className="btn btn-primary">
+        <Link href="/homeworks/new" className="btn btn-primary">
           + New homework
         </Link>
       </div>
@@ -31,7 +31,7 @@ export default async function AdminHomePage() {
           {homeworks.map((hw) => (
             <li key={hw.id}>
               <Link
-                href={`/admin/homeworks/${hw.id}`}
+                href={`/homeworks/${hw.id}`}
                 className="card flex items-center justify-between p-4 hover:border-rahoot-red"
               >
                 <div>

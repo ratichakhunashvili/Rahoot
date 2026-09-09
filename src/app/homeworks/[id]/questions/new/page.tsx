@@ -5,7 +5,7 @@ import { QuestionForm } from "../QuestionForm";
 export default async function NewQuestionPage({
   params,
   searchParams,
-}: PageProps<"/admin/homeworks/[id]/questions/new">) {
+}: PageProps<"/homeworks/[id]/questions/new">) {
   const { id } = await params;
   const search = await searchParams;
   const error = typeof search?.error === "string" ? search.error : null;
@@ -14,7 +14,7 @@ export default async function NewQuestionPage({
 
   return (
     <div className="mx-auto max-w-lg">
-      <Link href={`/admin/homeworks/${id}`} className="text-sm text-rahoot-red hover:underline">
+      <Link href={`/homeworks/${id}`} className="text-sm text-rahoot-red hover:underline">
         &larr; Back to homework
       </Link>
       <h1 className="mt-2 text-2xl font-bold">Add a question</h1>

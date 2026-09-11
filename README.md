@@ -1,22 +1,24 @@
 # Rahoot
 
-A red & white, Kahoot-style quiz app with two strictly separate sides:
+A black & orange, Kahoot-style quiz app with no registration required to create or play a quiz:
 
-- **Admin panel** (`/admin`) - only reachable by the one hardcoded admin account. Create homeworks, add multiple-choice or paragraph questions, get a QR code + join code for each one, host a live session or leave it as self-paced homework, grade paragraph answers, and view the leaderboard.
-- **Student side** - no login, no accounts. A student scans the QR code (or types the join code), enters just their first and last name, and plays. They can never reach `/admin` - it's blocked at the routing layer for anyone without a valid admin session.
+- **Anyone can create a homework** - no login, just a title. The creator gets a QR code + join code, adds multiple-choice or paragraph questions, and chooses whether it's a live hosted session or self-paced homework. A signed cookie remembers which homeworks a given browser created, so only that creator (or the admin) can edit/host/delete it later.
+- **Students** - no login either. Scan the QR code (or type the join code), enter a first and last name, and play.
+- **Admin panel** (`/admin`) - one hardcoded account, for oversight: it can see, manage, and delete every homework ever created, on top of whatever a regular creator can do for their own.
 
-Each homework is created in one of two modes, chosen by the admin:
+Each homework is created in one of two modes:
 
 - **Self-paced homework** - students join whenever and work through the questions on their own, like a normal assignment.
-- **Live hosted session** - true Kahoot-style: the admin hosts a live round from the "Host live session" screen, every student answers the same question at the same time with a countdown, and scoring rewards faster correct answers.
+- **Live hosted session** - true Kahoot-style: the creator hosts a live round from the "Host live session" screen, every student answers the same question at the same time with a countdown, and scoring rewards faster correct answers.
 
 ## Tech stack
 
-- **Next.js 16** (App Router) with a small **custom Node server** (`server.ts`) wrapping Next.js + **Socket.IO** - a custom server is required because live-mode gameplay needs persistent WebSocket connections, which plain serverless functions (e.g. Vercel) don't support.
-- **PostgreSQL** via **Prisma** - all homeworks, questions, students and answers are stored there, so nothing is lost on a restart.
-- **Tailwind CSS v4** for the red & white styling.
-- Admin auth is a single hardcoded email/password pair (from environment variables) behind a signed session cookie - there's intentionally no user database, since there's only ever one admin.
-- Student "sessions" are just a cookie remembering which student row is theirs for a given homework - not a real account, matching the "no authentication, just a name" requirement.
+- **Next.js 16** (App Router), deployed as a normal Vercel project - no custom server.
+- **PostgreSQL via Supabase**, queried through **Prisma**.
+- **Supabase Realtime** (broadcast channels) drives live-mode sync - the host and every student's browser subscribe to a per-homework channel, and Server Actions broadcast phase/lobby/answer-count changes to it. There's no in-memory game state anywhere: `Homework.livePhase` / `currentQuestionIndex` / `questionStartedAt` in Postgres are the only source of truth (see `src/lib/live-game.ts`), which is what makes this safe to run on stateless serverless functions with no instance affinity between requests.
+- **Tailwind CSS v4** for the styling.
+- Admin auth is a single hardcoded email/password pair (from environment variables) behind a signed session cookie - there's intentionally no admin user database, since there's only ever one admin.
+- Both a homework creator's and a student's "sessions" are just a cookie remembering which row is theirs - not a real account, matching the "no authentication" requirement.
 
 ## Local development
 
@@ -24,16 +26,14 @@ Each homework is created in one of two modes, chosen by the admin:
    ```bash
    npm install
    ```
-2. **Start a local Postgres database.** Easiest option - Prisma's own local dev database, no Docker needed:
-   ```bash
-   npx prisma dev
-   ```
-   It prints a `DATABASE_URL` - leave that terminal running.
+2. **Create a [Supabase](https://supabase.com) project** (free tier is fine). You'll need, from Project Settings:
+   - Database → Connection string: the pooled one for `POSTGRES_PRISMA_URL`, the direct (non-pooled) one for `POSTGRES_URL_NON_POOLING` - Prisma migrations need a direct connection.
+   - API → Project URL for `NEXT_PUBLIC_SUPABASE_URL`, the `anon` public key for `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and the `service_role` secret key for `SUPABASE_SERVICE_ROLE_KEY` (server-only - never expose this one to the browser).
 3. **Configure environment variables**
    ```bash
    cp .env.example .env
    ```
-   Paste the `DATABASE_URL` from step 2, and set `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `SESSION_SECRET`.
+   Fill in the Supabase values from step 2, plus `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `SESSION_SECRET`.
 4. **Run migrations**
    ```bash
    npm run db:migrate
@@ -59,69 +59,18 @@ It creates throwaway homeworks/students, so only point it at a local/dev databas
 
 ## Deploying
 
-Because of the persistent Socket.IO connections, **this app needs a host that runs a normal long-lived Node process**. Plain Vercel-style serverless functions do not support the live-mode WebSocket connections. Two paths, depending on whether you want zero setup or zero cost - host pricing/free tiers change often, so double-check current terms before committing, but as of writing:
+This is a plain Next.js app - no custom server, no persistent connections to host - so it deploys to **Vercel** like any other Next.js project, with **Supabase** providing both Postgres and the live-mode realtime channel:
 
-- **Render's free tier does not support WebSockets** (long-lived connections are a paid-plan feature there) - a dead end for this app.
-- **Railway and Fly.io no longer have a real free tier** (trial credit only, then billed).
-- **Koyeb** currently has a genuinely free web service that does support WebSockets - the only catch is it scales to zero after an hour with no traffic, so the first visitor after a lull waits ~10-20s for a cold start. Fine for a classroom tool used in bursts.
+1. **Provision Supabase** via the Vercel Marketplace (`vercel integration add supabase`, or the Storage tab in the Vercel dashboard) so the database and API env vars below get injected into the project automatically. Alternatively, create the Supabase project yourself and add the env vars by hand.
+2. **Set environment variables** on the Vercel project (Project Settings → Environment Variables), for Production (and Preview, if you want preview deploys to work too):
+   - `POSTGRES_PRISMA_URL` / `POSTGRES_URL_NON_POOLING` - Supabase's pooled and direct Postgres connection strings.
+   - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` - from Supabase's API settings.
+   - `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and a fresh random `SESSION_SECRET` (`openssl rand -base64 32`) - **don't reuse the local dev secret in production.**
+   - `NEXT_PUBLIC_BASE_URL` - your Vercel production URL (students' phones must be able to reach it; used to build QR code join links).
+3. **Run the migration once** against the production database - either `vercel env pull && npx prisma migrate deploy` locally, or add it as a build step.
+4. Push to the branch Vercel is watching (or `vercel deploy --prod`). Vercel builds with `npm run build` and serves it - no start command to configure.
 
-### Managed platform (Koyeb, Railway, Render, Fly.io, ...)
-
-1. Provision a **hosted Postgres** database ([Neon](https://neon.com)'s free tier works well) and set `DATABASE_URL` to it. Keep `pgbouncer=true&connection_limit=5` on the connection string (see the comment in `.env.example`) - free/pooled Postgres tiers cap concurrent connections, and a live round's burst of simultaneous queries can exceed an uncapped default pool.
-2. Set `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and a fresh random `SESSION_SECRET` (`openssl rand -base64 32`) in the host's environment variables - **don't reuse the local dev secret in production.**
-3. Set `NEXT_PUBLIC_BASE_URL` to the public URL the host gives you (students' phones must be able to reach it).
-4. Set the build command to `npm run build` (this also runs `prisma generate` via `postinstall`, and `prisma migrate deploy` should be run once against the production database - most hosts let you run this as a one-off release command).
-5. Set the start command to `npm start`.
-
-### Self-hosting on a free VM (e.g. Oracle Cloud "Always Free")
-
-No cold starts, but real setup work - you're the sysadmin. `deploy/rahoot.service` and `deploy/Caddyfile` in this repo are ready-to-copy templates for steps 6-7.
-
-1. **Create the VM.** Sign up for Oracle Cloud, then Compute → Instances → Create Instance. Change the shape to **Ampere → VM.Standard.A1.Flex** and set it to the full Always Free allowance (4 OCPU / 24GB RAM). Ubuntu is the simplest image to follow the rest of these steps with. The free Ampere shape's availability varies by region and moment - if creation fails with an out-of-capacity error, retry or try another region.
-2. **Open the ports**, or requests never reach the VM:
-   - OCI console: the VM's subnet → Security Lists (or a Network Security Group) → add ingress rules for TCP 80 and 443 from `0.0.0.0/0` (22 for SSH should already be there).
-   - On the VM itself, Ubuntu images on OCI ship with `iptables` blocking everything but SSH by default:
-     ```bash
-     sudo apt install -y iptables-persistent
-     sudo iptables -I INPUT -p tcp --dport 80 -j ACCEPT
-     sudo iptables -I INPUT -p tcp --dport 443 -j ACCEPT
-     sudo netfilter-persistent save
-     ```
-3. **Point a domain at it** - an A record to the VM's public IP. You need a real domain for HTTPS; Caddy (step 6) gets you a certificate automatically, but only for one.
-4. **Install Node**, SSH'd into the VM:
-   ```bash
-   curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-   sudo apt install -y nodejs git
-   ```
-5. **Clone and configure the app:**
-   ```bash
-   git clone <your fork's URL> rahoot
-   cd rahoot
-   cp .env.example .env
-   nano .env   # DATABASE_URL (e.g. Neon), ADMIN_EMAIL/PASSWORD, a fresh SESSION_SECRET, NEXT_PUBLIC_BASE_URL=https://your-domain
-   npm ci
-   npm run build
-   npx prisma migrate deploy
-   ```
-6. **Run it as a service** so it survives SSH disconnects and reboots:
-   ```bash
-   sudo cp deploy/rahoot.service /etc/systemd/system/rahoot.service
-   # edit WorkingDirectory / ExecStart in it if your paths differ
-   sudo systemctl daemon-reload
-   sudo systemctl enable --now rahoot
-   ```
-7. **Put HTTPS in front of it with Caddy** (auto-provisions and renews the Let's Encrypt cert):
-   ```bash
-   sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
-   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-   sudo apt update && sudo apt install -y caddy
-   sudo cp deploy/Caddyfile /etc/caddy/Caddyfile   # edit the domain in it first
-   sudo systemctl reload caddy
-   ```
-8. Visit `https://your-domain`, log in as admin, and host a test round from two devices to confirm the WebSocket connection works end-to-end through Caddy.
-
-To ship a code update later: `git pull`, `npm ci`, `npm run build`, `sudo systemctl restart rahoot`.
+There's no `--max-instances=1` concern here the way there would be with an in-memory game-state server: live-game state lives entirely in Postgres (see `src/lib/live-game.ts`), and Supabase Realtime - not app-server memory - is what fans updates out to every connected browser. Any number of Vercel Function instances can handle requests for the same homework at once.
 
 ## How scoring works
 

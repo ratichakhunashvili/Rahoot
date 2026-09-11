@@ -48,3 +48,6 @@ next-env.d.ts
 
 # firebase-tools local deploy cache
 .firebase
+
+.vercel
+.env*

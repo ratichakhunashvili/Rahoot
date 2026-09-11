@@ -1,112 +1,131 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getSocket } from "@/lib/socket-client";
+import { useEffect, useRef, useState } from "react";
+import { subscribeToHomework } from "@/lib/realtime-client";
+import { studentJoinLobby, studentSubmitAnswer, autoRevealIfExpired } from "@/lib/live-game";
 import type {
   ClientQuestion,
   RevealPayload,
   FinishedPayload,
   LivePlayer,
   YourResultPayload,
-} from "@/lib/socket-events";
+  LiveState,
+} from "@/lib/live-events";
 import { Leaderboard } from "@/components/Leaderboard";
 import { OptionGrid, OptionTile } from "@/components/AnswerTiles";
-
-type Phase = "connecting" | "lobby" | "question" | "reveal" | "finished";
 
 export function LiveGame({
   homeworkId,
   homeworkTitle,
-  studentId,
-  clientToken,
   firstName,
+  initialState,
 }: {
   homeworkId: string;
   homeworkTitle: string;
-  studentId: string;
-  clientToken: string;
   firstName: string;
+  initialState: LiveState;
 }) {
-  const [phase, setPhase] = useState<Phase>("connecting");
-  const [players, setPlayers] = useState<LivePlayer[]>([]);
-  const [question, setQuestion] = useState<ClientQuestion | null>(null);
-  const [reveal, setReveal] = useState<RevealPayload | null>(null);
-  const [finished, setFinished] = useState<FinishedPayload | null>(null);
-  const [yourResult, setYourResult] = useState<YourResultPayload | null>(null);
-  const [hasAnswered, setHasAnswered] = useState(false);
+  const [phase, setPhase] = useState<LiveState["phase"]>(initialState.phase);
+  const [players, setPlayers] = useState<LivePlayer[]>(initialState.players);
+  const [question, setQuestion] = useState<ClientQuestion | null>(
+    initialState.phase === "QUESTION" ? initialState.question : null
+  );
+  const [reveal, setReveal] = useState<RevealPayload | null>(
+    initialState.phase === "REVEAL" ? initialState.reveal : null
+  );
+  const [finished, setFinished] = useState<FinishedPayload | null>(
+    initialState.phase === "FINISHED" ? initialState.finished : null
+  );
+  const [yourResult, setYourResult] = useState<YourResultPayload | null>(
+    initialState.phase === "QUESTION" || initialState.phase === "REVEAL" ? initialState.yourAnswer : null
+  );
+  const [hasAnswered, setHasAnswered] = useState(
+    initialState.phase === "QUESTION" ? !!initialState.yourAnswer : false
+  );
+  // We don't persist which option was picked, only the result - a reload
+  // mid-question just falls back to the plain "locked in" text instead of
+  // re-highlighting the specific tile, which is fine.
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const [textAnswer, setTextAnswer] = useState("");
   const [timeLeft, setTimeLeft] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const revealedRef = useRef(false);
+
+  function applyState(state: LiveState) {
+    setPlayers(state.players);
+    setPhase(state.phase);
+    setQuestion(state.phase === "QUESTION" ? state.question : null);
+    setReveal(state.phase === "REVEAL" ? state.reveal : null);
+    setFinished(state.phase === "FINISHED" ? state.finished : null);
+    if (state.phase === "QUESTION" || state.phase === "REVEAL") {
+      setYourResult(state.yourAnswer);
+      if (state.phase === "QUESTION") setHasAnswered(!!state.yourAnswer);
+    } else {
+      setYourResult(null);
+      setHasAnswered(false);
+      setSelectedOptionId(null);
+      setTextAnswer("");
+    }
+    if (state.phase === "QUESTION") revealedRef.current = false;
+  }
 
   useEffect(() => {
-    const socket = getSocket();
-
-    socket.emit("lobby:join", { homeworkId, studentId, clientToken }, (ok, err) => {
-      if (!ok) {
-        setError(err ?? "Could not join this session.");
-        return;
+    return subscribeToHomework(
+      homeworkId,
+      {
+        "lobby:update": ({ students }) => setPlayers(students),
+        "phase:question": (q) => {
+          setQuestion(q);
+          setReveal(null);
+          setYourResult(null);
+          setHasAnswered(false);
+          setSelectedOptionId(null);
+          setTextAnswer("");
+          revealedRef.current = false;
+          setPhase("QUESTION");
+        },
+        "phase:reveal": (r) => {
+          setReveal(r);
+          setPhase("REVEAL");
+        },
+        "phase:finished": (f) => {
+          setFinished(f);
+          setPhase("FINISHED");
+        },
+        "phase:lobby": () => {
+          setQuestion(null);
+          setReveal(null);
+          setFinished(null);
+          setYourResult(null);
+          setHasAnswered(false);
+          setSelectedOptionId(null);
+          setTextAnswer("");
+          setPhase("LOBBY");
+        },
+      },
+      () => {
+        studentJoinLobby(homeworkId)
+          .then((state) => state && applyState(state))
+          .catch((err) => console.error("Resync failed", err));
       }
-      setPhase((p) => (p === "connecting" ? "lobby" : p));
-    });
-
-    const onLobby = ({ students }: { students: LivePlayer[] }) => setPlayers(students);
-    const onQuestion = (q: ClientQuestion) => {
-      setQuestion(q);
-      setReveal(null);
-      setYourResult(null);
-      setHasAnswered(false);
-      setSelectedOptionId(null);
-      setTextAnswer("");
-      setPhase("question");
-    };
-    const onReveal = (r: RevealPayload) => {
-      setReveal(r);
-      setPhase("reveal");
-    };
-    const onFinished = (f: FinishedPayload) => {
-      setFinished(f);
-      setPhase("finished");
-    };
-    const onYourResult = (r: YourResultPayload) => setYourResult(r);
-    const onLobbyPhase = () => {
-      setQuestion(null);
-      setReveal(null);
-      setFinished(null);
-      setYourResult(null);
-      setHasAnswered(false);
-      setSelectedOptionId(null);
-      setTextAnswer("");
-      setPhase("lobby");
-    };
-
-    socket.on("lobby:update", onLobby);
-    socket.on("phase:question", onQuestion);
-    socket.on("phase:reveal", onReveal);
-    socket.on("phase:finished", onFinished);
-    socket.on("phase:lobby", onLobbyPhase);
-    socket.on("answer:you", onYourResult);
-
-    return () => {
-      socket.off("lobby:update", onLobby);
-      socket.off("phase:question", onQuestion);
-      socket.off("phase:reveal", onReveal);
-      socket.off("phase:finished", onFinished);
-      socket.off("phase:lobby", onLobbyPhase);
-      socket.off("answer:you", onYourResult);
-    };
-  }, [homeworkId, studentId, clientToken]);
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [homeworkId]);
 
   useEffect(() => {
-    if (phase !== "question" || !question) return;
+    if (phase !== "QUESTION" || !question) return;
     const tick = () => {
       const elapsed = (Date.now() - question.startedAt) / 1000;
-      setTimeLeft(Math.max(0, Math.ceil(question.timeLimitSec - elapsed)));
+      const left = Math.max(0, Math.ceil(question.timeLimitSec - elapsed));
+      setTimeLeft(left);
+      if (left === 0 && !revealedRef.current) {
+        revealedRef.current = true;
+        autoRevealIfExpired(homeworkId).catch((err) => console.error("Auto-reveal failed", err));
+      }
     };
     tick();
     const interval = setInterval(tick, 250);
     return () => clearInterval(interval);
-  }, [phase, question]);
+  }, [phase, question, homeworkId]);
 
   // Multiple choice submits the instant a tile is tapped - no separate
   // submit step. Paragraph answers still need an explicit submit since
@@ -115,40 +134,20 @@ export function LiveGame({
     if (!question || hasAnswered || question.type !== "MULTIPLE_CHOICE") return;
     setSelectedOptionId(optionId);
     setHasAnswered(true);
-    getSocket().emit("student:answer", {
-      homeworkId,
-      questionId: question.questionId,
-      selectedOptionId: optionId,
-    });
+    studentSubmitAnswer(homeworkId, question.questionId, { selectedOptionId: optionId })
+      .then((result) => result && setYourResult(result))
+      .catch((err) => console.error("Answer failed", err));
   }
 
   function submitParagraph() {
     if (!question || hasAnswered || question.type !== "PARAGRAPH" || !textAnswer.trim()) return;
-    getSocket().emit("student:answer", {
-      homeworkId,
-      questionId: question.questionId,
-      textAnswer,
-    });
     setHasAnswered(true);
+    studentSubmitAnswer(homeworkId, question.questionId, { textAnswer })
+      .then((result) => result && setYourResult(result))
+      .catch((err) => console.error("Answer failed", err));
   }
 
-  if (error) {
-    return (
-      <Centered>
-        <p className="text-lg font-semibold text-rahoot-red">{error}</p>
-      </Centered>
-    );
-  }
-
-  if (phase === "connecting") {
-    return (
-      <Centered>
-        <p className="text-rahoot-muted">Connecting...</p>
-      </Centered>
-    );
-  }
-
-  if (phase === "lobby") {
+  if (phase === "LOBBY") {
     return (
       <Centered>
         <p className="text-sm font-bold uppercase tracking-wide text-rahoot-red">
@@ -170,7 +169,7 @@ export function LiveGame({
     );
   }
 
-  if (phase === "question" && question) {
+  if (phase === "QUESTION" && question) {
     return (
       <div className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-6 py-8">
         <div className="flex items-center justify-between text-sm font-bold text-rahoot-muted">
@@ -230,7 +229,7 @@ export function LiveGame({
     );
   }
 
-  if (phase === "reveal" && reveal) {
+  if (phase === "REVEAL" && reveal) {
     return (
       <Centered>
         {reveal.type === "MULTIPLE_CHOICE" ? (
@@ -258,7 +257,7 @@ export function LiveGame({
     );
   }
 
-  if (phase === "finished" && finished) {
+  if (phase === "FINISHED" && finished) {
     return (
       <Centered>
         <p className="text-sm font-bold uppercase tracking-wide text-rahoot-red">Game over!</p>

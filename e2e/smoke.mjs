@@ -112,16 +112,18 @@ async function run() {
   ]);
   ok("student joined async homework and landed on question 0");
 
-  // Answer Q0 correctly (option "4")
+  // Answer Q0 correctly (option "4"). Same OptionTile buttons as live mode
+  // (see src/app/play/[homeworkId]/q/[index]/AsyncOptions.tsx) - a tile
+  // click selects AND submits the form, no separate submit button.
   const q0Text = await s1.textContent("h1");
   await assert(q0Text.includes("2 + 2"), "expected question 0 text, got " + q0Text);
-  const optionLabels = await s1.locator("label.card").allTextContents();
+  const asyncOptionButtons = s1.locator("button[aria-pressed]");
+  const optionLabels = await asyncOptionButtons.allTextContents();
   const correctIdx = optionLabels.findIndex((t) => t.trim() === "4");
   await assert(correctIdx >= 0, "could not find option '4'");
-  await s1.locator("label.card input[type=radio]").nth(correctIdx).check();
   await Promise.all([
     s1.waitForURL(new RegExp(`/play/${asyncHwId}/q/1$`)),
-    s1.click('button[type="submit"]'),
+    asyncOptionButtons.nth(correctIdx).click(),
   ]);
   ok("student answered question 0 (multiple choice)");
 
@@ -212,12 +214,15 @@ async function run() {
   await hostPage.waitForSelector("text=Capital of France?", { timeout: 10000 });
   ok("both host and student see the live question");
 
-  const liveOptionLabels = await s2.locator("button.card").allTextContents();
+  // Answer tiles are OptionTile buttons (see src/components/AnswerTiles.tsx)
+  // - a tile click both selects AND submits, there's no separate "Submit
+  // answer" step for multiple choice.
+  const liveOptionButtons = s2.locator("button[aria-pressed]");
+  const liveOptionLabels = await liveOptionButtons.allTextContents();
   const parisIdx = liveOptionLabels.findIndex((t) => t.includes("Paris"));
   await assert(parisIdx >= 0, "expected Paris option on student screen");
-  await s2.locator("button.card").nth(parisIdx).click();
-  await s2.click('button:has-text("Submit answer")');
-  await s2.waitForSelector("text=Answer locked in", { timeout: 5000 });
+  await liveOptionButtons.nth(parisIdx).click();
+  await s2.waitForSelector("text=/[Ll]ocked in/", { timeout: 5000 });
   ok("student submitted live answer");
 
   await hostPage.waitForSelector("text=1/1 answered", { timeout: 10000 });

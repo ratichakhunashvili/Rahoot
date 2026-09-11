@@ -1,10 +1,8 @@
 import { SignJWT, jwtVerify } from "jose";
 
 // Pure JWT/envelope helpers with no dependency on "next/headers" or the
-// "server-only" package, so this file can be safely imported both by
-// Next.js route/action code AND by server.ts (which runs under plain Node
-// via tsx, outside of Next's bundler - "server-only" throws unconditionally
-// in that context).
+// "server-only" package, so this file is safe to import from any server
+// context - plain Next.js route/action code, proxy.ts, etc.
 //
 // Everything lives in ONE cookie, "__session", holding a single signed JSON
 // envelope with an optional admin sub-session and any number of per-homework
@@ -114,11 +112,10 @@ export function withCreatorEntry(
   return { ...envelope, creators: withCappedEntry(envelope.creators, homeworkId, creatorToken, MAX_CREATOR_ENTRIES) };
 }
 
-// --- Backward-compatible admin-only surface, used by server.ts (raw
-// Socket.IO handshake cookies, outside Next's cookies() API) and proxy.ts
-// (reads the raw cookie itself rather than through session.ts). Both only
-// ever needed "cookie name in, admin payload out" - that contract is
-// unchanged even though the cookie now holds a shared envelope.
+// --- Backward-compatible admin-only surface, used by proxy.ts (reads the
+// raw cookie itself rather than through session.ts) - it only ever needed
+// "cookie name in, admin payload out", which is unchanged even though the
+// cookie now holds a shared envelope.
 export function adminSessionCookieName() {
   return SESSION_COOKIE_NAME;
 }

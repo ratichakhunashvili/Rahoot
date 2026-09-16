@@ -1,13 +1,24 @@
 // Rahoot data model
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider   = "prisma-client"
+  output     = "../src/generated/prisma"
+  // "client" (rather than the default "library") drops the native query
+  // engine binary entirely in favor of a WASM query compiler + the
+  // @prisma/adapter-pg driver adapter (see src/lib/prisma.ts) - avoids the
+  // "could not locate the Query Engine for runtime rhel-openssl-3.0.x"
+  // failure that a custom output path triggers on Vercel.
+  engineType = "client"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // Names match what the Vercel Supabase Marketplace integration injects
+  // (POSTGRES_PRISMA_URL = pooled/Supavisor transaction mode port 6543,
+  // POSTGRES_URL_NON_POOLING = direct/session mode port 5432, needed for
+  // migrations) so `vercel env pull` stays in sync with no manual aliasing.
+  url       = env("POSTGRES_PRISMA_URL")
+  directUrl = env("POSTGRES_URL_NON_POOLING")
 }
 
 enum HomeworkMode {
@@ -51,9 +62,13 @@ model Homework {
   // that predate this - those are only manageable by admin.
   creatorToken String?
 
-  // Live-session state (ignored for ASYNC homework)
-  livePhase           LivePhase? @default(LOBBY)
+  // Live-session state (ignored for ASYNC homework). questionStartedAt is
+  // what lets a serverless request rebuild an accurate countdown for a
+  // QUESTION in progress - there's no long-lived process to hold that in
+  // memory anymore (see src/lib/live-game.ts).
+  livePhase            LivePhase? @default(LOBBY)
   currentQuestionIndex Int?
+  questionStartedAt    DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

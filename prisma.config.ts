@@ -11,6 +11,12 @@ export default defineConfig({
   },
   engine: "classic",
   datasource: {
-    url: env("DATABASE_URL"),
+    // This block overwrites the datasource url-like attributes from
+    // schema.prisma entirely, so directUrl has to be repeated here too - it's
+    // not merged with schema.prisma's directUrl. Without it, `migrate deploy`
+    // silently falls back to the pooled url for the advisory lock migrations
+    // take, which hangs forever under Supabase's transaction-mode pooler.
+    url: env("POSTGRES_PRISMA_URL"),
+    directUrl: env("POSTGRES_URL_NON_POOLING"),
   },
 });

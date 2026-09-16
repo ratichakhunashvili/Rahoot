@@ -1,6 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getStudentForHomework } from "@/lib/student-session";
+import { getLiveState } from "@/lib/live-game";
 import { LiveGame } from "./LiveGame";
 
 export default async function PlayHomeworkPage({
@@ -18,13 +19,15 @@ export default async function PlayHomeworkPage({
   if (!homework) notFound();
 
   if (homework.mode === "LIVE") {
+    const state = await getLiveState(homeworkId, student.id);
+    if (!state) notFound();
     return (
       <LiveGame
         homeworkId={homework.id}
         homeworkTitle={homework.title}
-        studentId={student.id}
-        clientToken={student.clientToken}
         firstName={student.firstName}
+        joinCode={homework.joinCode}
+        initialState={state}
       />
     );
   }

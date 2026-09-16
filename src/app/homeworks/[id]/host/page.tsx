@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getLiveState } from "@/lib/live-game";
 import { HostClient } from "./HostClient";
 
 export default async function HostLivePage({
@@ -12,11 +13,15 @@ export default async function HostLivePage({
   });
   if (!homework || homework.mode !== "LIVE") notFound();
 
+  const state = await getLiveState(id);
+  if (!state) notFound();
+
   return (
     <HostClient
       homeworkId={homework.id}
       title={homework.title}
       totalQuestions={homework._count.questions}
+      initialState={state}
     />
   );
 }

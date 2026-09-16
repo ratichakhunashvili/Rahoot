@@ -1,123 +1,141 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { getSocket } from "@/lib/socket-client";
+import { subscribeToHomework } from "@/lib/realtime-client";
+import {
+  hostStartGame,
+  hostRevealQuestion,
+  hostNextQuestion,
+  hostEndGame,
+  hostRestartGame,
+  autoRevealIfExpired,
+  getLiveState,
+} from "@/lib/live-game";
 import type {
   ClientQuestion,
   RevealPayload,
   FinishedPayload,
   LivePlayer,
-} from "@/lib/socket-events";
+  LiveState,
+} from "@/lib/live-events";
 import { Leaderboard } from "@/components/Leaderboard";
-
-type Phase = "connecting" | "lobby" | "question" | "reveal" | "finished";
 
 export function HostClient({
   homeworkId,
   title,
   totalQuestions,
+  initialState,
 }: {
   homeworkId: string;
   title: string;
   totalQuestions: number;
+  initialState: LiveState;
 }) {
-  const [phase, setPhase] = useState<Phase>("connecting");
-  const [players, setPlayers] = useState<LivePlayer[]>([]);
-  const [question, setQuestion] = useState<ClientQuestion | null>(null);
-  const [reveal, setReveal] = useState<RevealPayload | null>(null);
-  const [finished, setFinished] = useState<FinishedPayload | null>(null);
+  const [phase, setPhase] = useState<LiveState["phase"]>(initialState.phase);
+  const [players, setPlayers] = useState<LivePlayer[]>(initialState.players);
+  const [question, setQuestion] = useState<ClientQuestion | null>(
+    initialState.phase === "QUESTION" ? initialState.question : null
+  );
+  const [reveal, setReveal] = useState<RevealPayload | null>(
+    initialState.phase === "REVEAL" ? initialState.reveal : null
+  );
+  const [finished, setFinished] = useState<FinishedPayload | null>(
+    initialState.phase === "FINISHED" ? initialState.finished : null
+  );
   const [answeredCount, setAnsweredCount] = useState(0);
   const [timeLeft, setTimeLeft] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const revealedRef = useRef(false);
+
+  function applyState(state: LiveState) {
+    setPlayers(state.players);
+    setPhase(state.phase);
+    setQuestion(state.phase === "QUESTION" ? state.question : null);
+    setReveal(state.phase === "REVEAL" ? state.reveal : null);
+    setFinished(state.phase === "FINISHED" ? state.finished : null);
+    if (state.phase === "QUESTION") revealedRef.current = false;
+    if (state.phase !== "QUESTION") setAnsweredCount(0);
+  }
 
   useEffect(() => {
-    const socket = getSocket();
-
-    socket.emit("host:join", { homeworkId }, (ok, err) => {
-      if (!ok) {
-        setError(err ?? "Could not host this session - this browser doesn't have access to it.");
-        return;
+    return subscribeToHomework(
+      homeworkId,
+      {
+        "lobby:update": ({ students }) => setPlayers(students),
+        "phase:question": (q) => {
+          setQuestion(q);
+          setReveal(null);
+          setAnsweredCount(0);
+          revealedRef.current = false;
+          setPhase("QUESTION");
+        },
+        "phase:reveal": (r) => {
+          setReveal(r);
+          setPhase("REVEAL");
+        },
+        "phase:finished": (f) => {
+          setFinished(f);
+          setPhase("FINISHED");
+        },
+        "phase:lobby": () => {
+          setQuestion(null);
+          setReveal(null);
+          setFinished(null);
+          setAnsweredCount(0);
+          setPhase("LOBBY");
+        },
+        "answer:count": ({ answered }) => setAnsweredCount(answered),
+      },
+      () => {
+        getLiveState(homeworkId)
+          .then((state) => state && applyState(state))
+          .catch((err) => console.error("Resync failed", err));
       }
-      setPhase((p) => (p === "connecting" ? "lobby" : p));
-    });
-
-    const onLobby = ({ students }: { students: LivePlayer[] }) => setPlayers(students);
-    const onQuestion = (q: ClientQuestion) => {
-      setQuestion(q);
-      setReveal(null);
-      setAnsweredCount(0);
-      setPhase("question");
-    };
-    const onReveal = (r: RevealPayload) => {
-      setReveal(r);
-      setPhase("reveal");
-    };
-    const onFinished = (f: FinishedPayload) => {
-      setFinished(f);
-      setPhase("finished");
-    };
-    const onCount = ({ answered }: { answered: number; total: number }) =>
-      setAnsweredCount(answered);
-    const onLobbyPhase = () => {
-      setQuestion(null);
-      setReveal(null);
-      setFinished(null);
-      setAnsweredCount(0);
-      setPhase("lobby");
-    };
-
-    socket.on("lobby:update", onLobby);
-    socket.on("phase:question", onQuestion);
-    socket.on("phase:reveal", onReveal);
-    socket.on("phase:finished", onFinished);
-    socket.on("phase:lobby", onLobbyPhase);
-    socket.on("answer:count", onCount);
-
-    return () => {
-      socket.off("lobby:update", onLobby);
-      socket.off("phase:question", onQuestion);
-      socket.off("phase:reveal", onReveal);
-      socket.off("phase:finished", onFinished);
-      socket.off("phase:lobby", onLobbyPhase);
-      socket.off("answer:count", onCount);
-    };
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [homeworkId]);
 
   useEffect(() => {
-    if (phase !== "question" || !question) return;
+    if (phase !== "QUESTION" || !question) return;
     const tick = () => {
       const elapsed = (Date.now() - question.startedAt) / 1000;
-      setTimeLeft(Math.max(0, Math.ceil(question.timeLimitSec - elapsed)));
+      const left = Math.max(0, Math.ceil(question.timeLimitSec - elapsed));
+      setTimeLeft(left);
+      if (left === 0 && !revealedRef.current) {
+        revealedRef.current = true;
+        autoRevealIfExpired(homeworkId).catch((err) => console.error("Auto-reveal failed", err));
+      }
     };
     tick();
     const interval = setInterval(tick, 250);
     return () => clearInterval(interval);
-  }, [phase, question]);
+  }, [phase, question, homeworkId]);
 
-  const start = () => getSocket().emit("host:start", { homeworkId });
-  const next = () => getSocket().emit("host:next", { homeworkId });
-  const end = () => getSocket().emit("host:end", { homeworkId });
+  const start = () => startTransition(() => {
+    hostStartGame(homeworkId).catch((err) => console.error("Start failed", err));
+  });
+  const next = () => startTransition(() => {
+    if (phase === "QUESTION") {
+      hostRevealQuestion(homeworkId).catch((err) => console.error("Reveal failed", err));
+    } else if (phase === "REVEAL") {
+      hostNextQuestion(homeworkId).catch((err) => console.error("Next failed", err));
+    }
+  });
+  const end = () => startTransition(() => {
+    hostEndGame(homeworkId).catch((err) => console.error("End failed", err));
+  });
   const restart = () => {
     if (
       window.confirm(
-        "Restart the game? This deletes every answer already submitted for this homework and sends everyone back to the lobby."
+        "Restart the game? This removes every student who joined (and every answer they submitted) - they'll need to rejoin with the join code."
       )
     ) {
-      getSocket().emit("host:restart", { homeworkId });
+      startTransition(() => {
+        hostRestartGame(homeworkId).catch((err) => console.error("Restart failed", err));
+      });
     }
   };
-
-  if (error) {
-    return (
-      <Centered>
-        <p className="font-semibold text-rahoot-red">{error}</p>
-        <Link href={`/homeworks/${homeworkId}`} className="btn btn-outline mt-4">
-          Back
-        </Link>
-      </Centered>
-    );
-  }
 
   return (
     <div className="flex flex-1 flex-col">
@@ -131,13 +149,7 @@ export function HostClient({
         </Link>
       </div>
 
-      {phase === "connecting" && (
-        <Centered>
-          <p className="text-rahoot-muted">Connecting...</p>
-        </Centered>
-      )}
-
-      {phase === "lobby" && (
+      {phase === "LOBBY" && (
         <Centered>
           <p className="text-sm font-bold uppercase tracking-wide text-rahoot-muted">
             Waiting in the lobby
@@ -153,7 +165,7 @@ export function HostClient({
           </div>
           <button
             onClick={start}
-            disabled={totalQuestions === 0 || players.length === 0}
+            disabled={totalQuestions === 0 || players.length === 0 || isPending}
             className="btn btn-primary mt-8"
           >
             Start game
@@ -164,7 +176,7 @@ export function HostClient({
         </Centered>
       )}
 
-      {phase === "question" && question && (
+      {phase === "QUESTION" && question && (
         <Centered>
           <p className="text-sm font-bold text-rahoot-muted">
             Question {question.index + 1} of {question.total}
@@ -176,13 +188,13 @@ export function HostClient({
           <p className="mt-2 text-rahoot-muted">
             {answeredCount}/{players.length} answered
           </p>
-          <button onClick={next} className="btn btn-primary mt-8">
+          <button onClick={next} disabled={isPending} className="btn btn-primary mt-8">
             Reveal answer
           </button>
         </Centered>
       )}
 
-      {phase === "reveal" && reveal && (
+      {phase === "REVEAL" && reveal && (
         <Centered>
           <p className="text-sm font-bold uppercase tracking-wide text-rahoot-muted">Results</p>
           {reveal.type === "MULTIPLE_CHOICE" && (
@@ -218,13 +230,13 @@ export function HostClient({
           <div className="mt-3 w-full max-w-sm">
             <Leaderboard entries={reveal.leaderboard.slice(0, 5)} />
           </div>
-          <button onClick={next} className="btn btn-primary mt-8">
+          <button onClick={next} disabled={isPending} className="btn btn-primary mt-8">
             Next
           </button>
         </Centered>
       )}
 
-      {phase === "finished" && finished && (
+      {phase === "FINISHED" && finished && (
         <Centered>
           <p className="text-sm font-bold uppercase tracking-wide text-rahoot-red">Game over!</p>
           <h2 className="mt-2 text-2xl font-bold">Final leaderboard</h2>
@@ -235,19 +247,19 @@ export function HostClient({
             <Link href={`/homeworks/${homeworkId}`} className="btn btn-outline">
               Back to homework
             </Link>
-            <button onClick={restart} className="btn btn-primary">
+            <button onClick={restart} disabled={isPending} className="btn btn-primary">
               Restart game
             </button>
           </div>
         </Centered>
       )}
 
-      {(phase === "lobby" || phase === "question" || phase === "reveal") && (
+      {(phase === "LOBBY" || phase === "QUESTION" || phase === "REVEAL") && (
         <div className="mt-auto flex justify-center gap-4 pt-6">
-          <button onClick={restart} className="text-sm text-rahoot-muted hover:text-rahoot-red">
+          <button onClick={restart} disabled={isPending} className="text-sm text-rahoot-muted hover:text-rahoot-red">
             Restart game
           </button>
-          <button onClick={end} className="text-sm text-rahoot-muted hover:text-rahoot-red">
+          <button onClick={end} disabled={isPending} className="text-sm text-rahoot-muted hover:text-rahoot-red">
             End session early
           </button>
         </div>

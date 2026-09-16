@@ -238,6 +238,34 @@ async function run() {
   await hostPage.waitForSelector("text=Final leaderboard", { timeout: 10000 });
   ok("game finished with final leaderboard shown to both host and student");
 
+  // Restart doesn't just reset scores - it removes every student, so a
+  // still-open student tab has to be kicked out and told to rejoin rather
+  // than silently landing back in a lobby they're no longer part of.
+  hostPage.on("dialog", (d) => d.accept());
+  await hostPage.click('button:has-text("Restart game")');
+  await s2.waitForSelector("text=The host restarted this session", { timeout: 10000 });
+  ok("restart kicks the still-open student tab out with a rejoin prompt");
+
+  await hostPage.waitForSelector("text=Waiting in the lobby", { timeout: 10000 });
+  await assert(
+    (await hostPage.textContent("body")).includes("0"),
+    "expected host's lobby player count to reset to 0"
+  );
+  ok("host's lobby resets to 0 players after restart");
+
+  await Promise.all([
+    s2.waitForURL(`${BASE}/join/${liveJoinCode}`),
+    s2.click('a:has-text("Rejoin")'),
+  ]);
+  await s2.fill('input[name="firstName"]', "Grace");
+  await s2.fill('input[name="lastName"]', "Hopper");
+  await Promise.all([
+    s2.waitForURL(`${BASE}/play/${liveHwId}`),
+    s2.click('button[type="submit"]'),
+  ]);
+  await s2.waitForSelector("text=You're in, Grace!", { timeout: 10000 });
+  ok("student rejoins as a fresh student after being removed by a restart");
+
   await s2Ctx.close();
   await adminCtx.close();
 }

@@ -128,7 +128,7 @@ export function HostClient({
   const restart = () => {
     if (
       window.confirm(
-        "Restart the game? This deletes every answer already submitted for this homework and sends everyone back to the lobby."
+        "Restart the game? This removes every student who joined (and every answer they submitted) - they'll need to rejoin with the join code."
       )
     ) {
       startTransition(() => {

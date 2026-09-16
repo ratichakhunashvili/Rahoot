@@ -273,18 +273,28 @@ export async function hostEndGame(homeworkId: string): Promise<FinishedPayload> 
   return finishGame(homeworkId);
 }
 
-/** A true do-over: wipes every submitted answer for this homework and resets the live session back to the lobby. */
+/**
+ * A true do-over: removes every student who joined this homework (which
+ * cascades to delete their answers too - see Answer.student's onDelete:
+ * Cascade) and resets the live session back to an empty lobby. Not just a
+ * score reset - a student's browser still holds a cookie pointing at their
+ * now-deleted Student row, so getStudentForHomework() will find nothing for
+ * them next time and they have to rejoin with the join code, same as
+ * someone who never played this homework before.
+ */
 export async function hostRestartGame(homeworkId: string): Promise<LivePlayer[]> {
   if (!(await canManageHomework(homeworkId))) throw new Error("Not authorized");
 
-  await prisma.answer.deleteMany({ where: { question: { homeworkId } } });
+  await prisma.student.deleteMany({ where: { homeworkId } });
   await prisma.homework.update({
     where: { id: homeworkId },
     data: { livePhase: "LOBBY", currentQuestionIndex: null, questionStartedAt: null },
   });
 
+  // "phase:lobby" here specifically means "the host restarted - your student
+  // record is gone, go rejoin" (see LiveGame.tsx), not just "state reset".
   await broadcast(homeworkId, "phase:lobby", {});
-  const players = await fetchPlayers(homeworkId);
+  const players = await fetchPlayers(homeworkId); // empty now, but keeps the host's lobby view in sync via the same path as a real join
   await broadcast(homeworkId, "lobby:update", { students: players });
   return players;
 }

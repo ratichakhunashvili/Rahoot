@@ -22,6 +22,17 @@ connectionUrl.searchParams.delete("sslmode");
 const adapter = new PrismaPg({
   connectionString: connectionUrl.toString(),
   ssl: { rejectUnauthorized: false },
+  // Each Vercel Function instance gets its own pool (this module is a
+  // singleton per instance, not per request), and a sudden burst of
+  // concurrent traffic can spin up dozens of instances at once - even a
+  // "conservative" max of 3 each hit Supabase's free-tier pooler cap
+  // (200 clients total, shared project-wide) with a real 200-concurrent-
+  // request burst in testing ("(EMAXCONN) max client connections reached").
+  // 1 is Prisma's own documented guidance for serverless behind an
+  // external pooler (Supavisor here) - it's the pooler's job to multiplex
+  // many short-lived client connections down to a small number of actual
+  // Postgres backend connections, not this pool's.
+  max: 1,
 });
 
 // Reuse a single PrismaClient across hot-reloads in dev so we don't exhaust

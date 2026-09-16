@@ -26,6 +26,7 @@ export default async function PlayHomeworkPage({
         homeworkId={homework.id}
         homeworkTitle={homework.title}
         firstName={student.firstName}
+        joinCode={homework.joinCode}
         initialState={state}
       />
     );

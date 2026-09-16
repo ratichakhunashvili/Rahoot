@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { subscribeToHomework } from "@/lib/realtime-client";
 import { studentJoinLobby, studentSubmitAnswer, autoRevealIfExpired } from "@/lib/live-game";
 import type {
@@ -14,18 +15,28 @@ import type {
 import { Leaderboard } from "@/components/Leaderboard";
 import { OptionGrid, OptionTile } from "@/components/AnswerTiles";
 
+// "REMOVED" is purely a client-side phase, not part of the shared LiveState
+// union - it's what a student sees after the host restarts the game (see
+// hostRestartGame in live-game.ts), which deletes every Student row for this
+// homework rather than just resetting scores. Their session cookie is now
+// pointing at a Student row that no longer exists, so there's no "back to
+// the lobby" to show them - they need to rejoin from scratch.
+type Phase = LiveState["phase"] | "REMOVED";
+
 export function LiveGame({
   homeworkId,
   homeworkTitle,
   firstName,
+  joinCode,
   initialState,
 }: {
   homeworkId: string;
   homeworkTitle: string;
   firstName: string;
+  joinCode: string;
   initialState: LiveState;
 }) {
-  const [phase, setPhase] = useState<LiveState["phase"]>(initialState.phase);
+  const [phase, setPhase] = useState<Phase>(initialState.phase);
   const [players, setPlayers] = useState<LivePlayer[]>(initialState.players);
   const [question, setQuestion] = useState<ClientQuestion | null>(
     initialState.phase === "QUESTION" ? initialState.question : null
@@ -49,6 +60,7 @@ export function LiveGame({
   const [textAnswer, setTextAnswer] = useState("");
   const [timeLeft, setTimeLeft] = useState(0);
   const revealedRef = useRef(false);
+  const removedRef = useRef(false); // set once we've received the "you were removed" broadcast below
 
   function applyState(state: LiveState) {
     setPlayers(state.players);
@@ -91,6 +103,9 @@ export function LiveGame({
           setFinished(f);
           setPhase("FINISHED");
         },
+        // The host restarted the game - every Student row (including ours)
+        // was just deleted, so there's no lobby to rejoin in place. See the
+        // Phase type comment above.
         "phase:lobby": () => {
           setQuestion(null);
           setReveal(null);
@@ -99,10 +114,15 @@ export function LiveGame({
           setHasAnswered(false);
           setSelectedOptionId(null);
           setTextAnswer("");
-          setPhase("LOBBY");
+          removedRef.current = true;
+          setPhase("REMOVED");
         },
       },
       () => {
+        // Skip the resync fetch once we know we've been removed - our own
+        // studentId no longer resolves to anything, so studentJoinLobby()
+        // would just return null (getStudentForHomework finds nothing).
+        if (removedRef.current) return;
         studentJoinLobby(homeworkId)
           .then((state) => state && applyState(state))
           .catch((err) => console.error("Resync failed", err));
@@ -145,6 +165,23 @@ export function LiveGame({
     studentSubmitAnswer(homeworkId, question.questionId, { textAnswer })
       .then((result) => result && setYourResult(result))
       .catch((err) => console.error("Answer failed", err));
+  }
+
+  if (phase === "REMOVED") {
+    return (
+      <Centered>
+        <p className="text-sm font-bold uppercase tracking-wide text-rahoot-red">
+          {homeworkTitle}
+        </p>
+        <h1 className="mt-2 text-2xl font-bold">The host restarted this session</h1>
+        <p className="mt-1 text-rahoot-muted">
+          Everyone was removed so it could start fresh - rejoin to play again.
+        </p>
+        <Link href={`/join/${joinCode}`} className="btn btn-primary mt-8">
+          Rejoin
+        </Link>
+      </Centered>
+    );
   }
 
   if (phase === "LOBBY") {

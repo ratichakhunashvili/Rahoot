@@ -22,6 +22,22 @@ import type {
 // something, broadcasts the change over Supabase Realtime (see
 // realtime-server.ts) so every connected browser stays in sync.
 
+/**
+ * The question at position `index` among this homework's questions, sorted
+ * the same way everywhere else (ASYNC play, the admin list). Deliberately
+ * NOT `where: { order: index }` - a deleted question leaves a gap in
+ * `Question.order` (it's only ever assigned once, at creation), so matching
+ * on the raw value can miss a question entirely and stall the live game.
+ * Indexing into the sorted list is robust to gaps or duplicate `order`s.
+ */
+async function questionAtIndex(homeworkId: string, index: number) {
+  const questions = await prisma.question.findMany({
+    where: { homeworkId },
+    orderBy: { order: "asc" },
+  });
+  return { question: questions[index] ?? null, total: questions.length };
+}
+
 async function fetchPlayers(homeworkId: string): Promise<LivePlayer[]> {
   const students = await prisma.student.findMany({
     where: { homeworkId },
@@ -93,13 +109,13 @@ export async function getLiveState(
     homework.currentQuestionIndex != null &&
     homework.questionStartedAt
   ) {
-    const [question, total] = await Promise.all([
-      prisma.question.findFirst({
-        where: { homeworkId, order: homework.currentQuestionIndex },
-        include: { options: { orderBy: { order: "asc" } } },
-      }),
-      prisma.question.count({ where: { homeworkId } }),
-    ]);
+    const { question: found, total } = await questionAtIndex(homeworkId, homework.currentQuestionIndex);
+    const question = found
+      ? await prisma.question.findUnique({
+          where: { id: found.id },
+          include: { options: { orderBy: { order: "asc" } } },
+        })
+      : null;
     if (question) {
       const payload: ClientQuestion = {
         questionId: question.id,
@@ -117,9 +133,7 @@ export async function getLiveState(
   }
 
   if (homework.livePhase === "REVEAL" && homework.currentQuestionIndex != null) {
-    const question = await prisma.question.findFirst({
-      where: { homeworkId, order: homework.currentQuestionIndex },
-    });
+    const { question } = await questionAtIndex(homeworkId, homework.currentQuestionIndex);
     if (question) {
       const reveal = await buildRevealPayload(homeworkId, question.id);
       if (reveal) {
@@ -136,13 +150,13 @@ export async function getLiveState(
 }
 
 async function startQuestion(homeworkId: string, index: number): Promise<ClientQuestion | null> {
-  const [question, total] = await Promise.all([
-    prisma.question.findFirst({
-      where: { homeworkId, order: index },
-      include: { options: { orderBy: { order: "asc" } } },
-    }),
-    prisma.question.count({ where: { homeworkId } }),
-  ]);
+  const { question: found, total } = await questionAtIndex(homeworkId, index);
+  const question = found
+    ? await prisma.question.findUnique({
+        where: { id: found.id },
+        include: { options: { orderBy: { order: "asc" } } },
+      })
+    : null;
   if (!question) return null;
 
   const startedAt = new Date();
@@ -210,9 +224,7 @@ export async function hostRevealQuestion(homeworkId: string): Promise<RevealPayl
   if (!(await canManageHomework(homeworkId))) throw new Error("Not authorized");
   const homework = await prisma.homework.findUnique({ where: { id: homeworkId } });
   if (!homework || homework.currentQuestionIndex == null) throw new Error("No active question");
-  const question = await prisma.question.findFirst({
-    where: { homeworkId, order: homework.currentQuestionIndex },
-  });
+  const { question } = await questionAtIndex(homeworkId, homework.currentQuestionIndex);
   if (!question) throw new Error("Question not found");
 
   const payload = await transitionToReveal(homeworkId, question.id);
@@ -239,9 +251,7 @@ export async function autoRevealIfExpired(homeworkId: string): Promise<RevealPay
   ) {
     return null;
   }
-  const question = await prisma.question.findFirst({
-    where: { homeworkId, order: homework.currentQuestionIndex },
-  });
+  const { question } = await questionAtIndex(homeworkId, homework.currentQuestionIndex);
   if (!question) return null;
 
   const elapsedMs = Date.now() - homework.questionStartedAt.getTime();

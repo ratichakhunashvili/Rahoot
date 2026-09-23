@@ -159,7 +159,25 @@ export async function updateQuestion(
 
 export async function deleteQuestion(homeworkId: string, questionId: string) {
   await requireManage(homeworkId);
-  await prisma.question.delete({ where: { id: questionId } });
+
+  // Renumber the remaining questions to stay a contiguous 0..N-1 sequence -
+  // otherwise a deletion anywhere but the end leaves a gap in `order`, which
+  // breaks the LIVE host flow (it looks up "the current question" by that
+  // exact position - see questionAtIndex in live-game.ts) and can even let a
+  // later-created question collide with a leftover value.
+  const remaining = await prisma.question.findMany({
+    where: { homeworkId, id: { not: questionId } },
+    orderBy: { order: "asc" },
+    select: { id: true },
+  });
+
+  await prisma.$transaction([
+    prisma.question.delete({ where: { id: questionId } }),
+    ...remaining.map((q, i) =>
+      prisma.question.update({ where: { id: q.id }, data: { order: i } })
+    ),
+  ]);
+
   revalidatePath(`/homeworks/${homeworkId}`);
   redirect(`/homeworks/${homeworkId}`);
 }

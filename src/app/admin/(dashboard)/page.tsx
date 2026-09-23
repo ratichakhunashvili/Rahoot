@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { duplicateHomework } from "./actions";
 
 const STATUS_STYLES: Record<string, string> = {
   DRAFT: "bg-zinc-800 text-zinc-300",
@@ -29,11 +30,8 @@ export default async function AdminHomePage() {
       ) : (
         <ul className="mt-6 flex flex-col gap-3">
           {homeworks.map((hw) => (
-            <li key={hw.id}>
-              <Link
-                href={`/homeworks/${hw.id}`}
-                className="card flex items-center justify-between p-4 hover:border-rahoot-red"
-              >
+            <li key={hw.id} className="card flex items-center justify-between p-4 hover:border-rahoot-red">
+              <Link href={`/homeworks/${hw.id}`} className="flex-1">
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-bold">{hw.title}</span>
@@ -53,6 +51,11 @@ export default async function AdminHomePage() {
                   </p>
                 </div>
               </Link>
+              <form action={duplicateHomework.bind(null, hw.id)}>
+                <button type="submit" className="btn btn-outline ml-4">
+                  Duplicate
+                </button>
+              </form>
             </li>
           ))}
         </ul>
